@@ -185,14 +185,39 @@ fn traverse_pattern(&self, pattern_vertex: &Vertex<T>) -> Vec<Vec<T>> {
 }
 
 fn main() {
+
+
+fn filter_grammatically_incorrect_paths(paths: Vec<Vec<&str>>) -> Vec<Vec<&str>> {
+
+fn is_vowel_start(word: &str) -> bool {
+matches!(word.chars().next(), Some('a' | 'e' | 'i' | 'o' | 'u'))
+}
+
+
+    paths.into_iter()
+        .filter(|path| {
+            path.windows(2).all(|words| {
+                // Check for 'a' or 'the' before a word starting with a vowel
+                if (words[0] == "a" || words[0] == "the") && is_vowel_start(words[1]) {
+                    false
+                } else {
+                    true
+                }
+            })
+        })
+        .collect()
+}
+
+
     let mut graph = Graph::new();
 
-    // Special Category Vertices
     let category_determiner = graph.add_vertex(vec!["Category: Determiner"]);
     let category_noun = graph.add_vertex(vec!["Category: Noun"]);
     let category_verb = graph.add_vertex(vec!["Category: Verb"]);
     let category_adjective = graph.add_vertex(vec!["Category: Adjective"]);
     let category_adverb = graph.add_vertex(vec!["Category: Adverb"]);
+
+
 
     let determiner1 = graph.add_vertex(vec!["a"]);
     let determiner2 = graph.add_vertex(vec!["an"]);
@@ -209,11 +234,22 @@ fn main() {
     graph.add_edge(category_noun.clone(), noun1.clone());
     graph.add_edge(category_noun.clone(), noun2.clone());
     graph.add_edge(category_noun.clone(), noun3.clone());
+    
+  
+    // Adding subjects
+    let noun4 = graph.add_vertex(vec!["aeroplane"]);
+    let noun5 = graph.add_vertex(vec!["elephant"]);
+    let noun6 = graph.add_vertex(vec!["octopus"]);
+    // Linking subjects to their category
+    graph.add_edge(category_noun.clone(), noun4.clone());
+    graph.add_edge(category_noun.clone(), noun5.clone());
+    graph.add_edge(category_noun.clone(), noun6.clone());
+
 
     // Adding verbs
     let verb1 = graph.add_vertex(vec!["eats"]);
-    let verb2 = graph.add_vertex(vec!["speaks"]);
-    let verb3 = graph.add_vertex(vec!["barks"]);
+    let verb2 = graph.add_vertex(vec!["speaks to"]);
+    let verb3 = graph.add_vertex(vec!["barks at"]);
     // Linking verbs to their category
     graph.add_edge(category_verb.clone(), verb1.clone());
     graph.add_edge(category_verb.clone(), verb2.clone());
@@ -238,22 +274,8 @@ fn main() {
     graph.add_edge(category_adverb.clone(), adverb3.clone());
 
     // Define sentence pattern categories
-    let pattern_nv = graph.add_vertex(vec!["Category: Noun", "Category: Verb"]);
-    let pattern_nvn = graph.add_vertex(vec!["Category: Noun", "Category: Verb", "Category: Noun"]);
-    let pattern_nvjn = graph.add_vertex(vec![
-        "Category: Noun",
-        "Category: Verb",
-        "Category: Adjective",
-        "Category: Noun",
-    ]);
-    let pattern_nevn = graph.add_vertex(vec![
-        "Category: Noun",
-        "Category: Adverb",
-        "Category: Verb",
-        "Category: Noun",
-    ]);
 
-    let pattern_dnvdn = graph.add_vertex(vec![
+    let pattern_dnvdn_1 = graph.add_vertex(vec![
         "Category: Determiner",
         "Category: Noun",
         "Category: Verb",
@@ -261,8 +283,9 @@ fn main() {
         "Category: Noun",
     ]);
 
-    // Call traverse_pattern with the correct number of arguments
-    let dnvdn_paths = graph.traverse_pattern(&pattern_dnvdn);
+    let dnvdn_paths_1 = graph.traverse_pattern(&pattern_dnvdn_1);
+    let filtered_paths = filter_grammatically_incorrect_paths(dnvdn_paths_1);
+
     
     /*
     dbg!(&all_sentences);
@@ -275,5 +298,5 @@ fn main() {
     // println!("Graph: {:?}", graph);
 
     dbg!(graph);
-    dbg!(dnvdn_paths);
+    dbg!(filtered_paths);
 }
