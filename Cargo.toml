@@ -1,6 +1,6 @@
 [package]
 name = "rgwml"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 author = "Ryan Gerard Wilson"
 description = "A crate for reducing cognitive overload while using rust for ml, ai, and data science operations"  # Your description
