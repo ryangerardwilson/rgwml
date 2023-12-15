@@ -105,38 +105,36 @@ impl<T: Clone + std::fmt::Debug + PartialEq + Display> Graph<T> {
         all_paths
     }
 
+    fn traverse_pattern(&self, pattern_vertex: &Vertex<T>) -> Vec<Vec<T>> {
+        // Ensure the vertex represents a pattern
+        if pattern_vertex.data.len() > 1 {
+            let mut sequences = vec![Vec::new()];
 
-fn traverse_pattern(&self, pattern_vertex: &Vertex<T>) -> Vec<Vec<T>> {
-    // Ensure the vertex represents a pattern
-    if pattern_vertex.data.len() > 1 {
-        let mut sequences = vec![Vec::new()];
+            // Iterate over each category in the pattern
+            for category in &pattern_vertex.data {
+                let mut new_sequences = Vec::new();
 
-        // Iterate over each category in the pattern
-        for category in &pattern_vertex.data {
-            let mut new_sequences = Vec::new();
+                // Find all vertices linked to this category
+                let linked_vertices = self.find_linked_vertices(category);
 
-            // Find all vertices linked to this category
-            let linked_vertices = self.find_linked_vertices(category);
-
-            // For each sequence so far, append each linked vertex to create new sequences
-            for sequence in &sequences {
-                for vertex in &linked_vertices {
-                    let mut new_sequence = sequence.clone();
-                    new_sequence.extend(vertex.data.clone());
-                    new_sequences.push(new_sequence);
+                // For each sequence so far, append each linked vertex to create new sequences
+                for sequence in &sequences {
+                    for vertex in &linked_vertices {
+                        let mut new_sequence = sequence.clone();
+                        new_sequence.extend(vertex.data.clone());
+                        new_sequences.push(new_sequence);
+                    }
                 }
+
+                sequences = new_sequences;
             }
 
-            sequences = new_sequences;
+            // Return the generated sequences
+            sequences
+        } else {
+            vec![] // or handle the error according to your needs
         }
-
-        // Return the generated sequences
-        sequences
-    } else {
-        vec![] // or handle the error according to your needs
     }
-}
-
 
     fn find_linked_vertices(&self, category: &T) -> Vec<&Vertex<T>> {
         self.edges
@@ -185,29 +183,25 @@ fn traverse_pattern(&self, pattern_vertex: &Vertex<T>) -> Vec<Vec<T>> {
 }
 
 fn main() {
+    fn filter_grammatically_incorrect_paths(paths: Vec<Vec<&str>>) -> Vec<Vec<&str>> {
+        fn is_vowel_start(word: &str) -> bool {
+            matches!(word.chars().next(), Some('a' | 'e' | 'i' | 'o' | 'u'))
+        }
 
-
-fn filter_grammatically_incorrect_paths(paths: Vec<Vec<&str>>) -> Vec<Vec<&str>> {
-
-fn is_vowel_start(word: &str) -> bool {
-matches!(word.chars().next(), Some('a' | 'e' | 'i' | 'o' | 'u'))
-}
-
-
-    paths.into_iter()
-        .filter(|path| {
-            path.windows(2).all(|words| {
-                // Check for 'a' or 'the' before a word starting with a vowel
-                if (words[0] == "a" || words[0] == "the") && is_vowel_start(words[1]) {
-                    false
-                } else {
-                    true
-                }
+        paths
+            .into_iter()
+            .filter(|path| {
+                path.windows(2).all(|words| {
+                    // Check for 'a' or 'the' before a word starting with a vowel
+                    if (words[0] == "a" || words[0] == "the") && is_vowel_start(words[1]) {
+                        false
+                    } else {
+                        true
+                    }
+                })
             })
-        })
-        .collect()
-}
-
+            .collect()
+    }
 
     let mut graph = Graph::new();
 
@@ -216,8 +210,6 @@ matches!(word.chars().next(), Some('a' | 'e' | 'i' | 'o' | 'u'))
     let category_verb = graph.add_vertex(vec!["Category: Verb"]);
     let category_adjective = graph.add_vertex(vec!["Category: Adjective"]);
     let category_adverb = graph.add_vertex(vec!["Category: Adverb"]);
-
-
 
     let determiner1 = graph.add_vertex(vec!["a"]);
     let determiner2 = graph.add_vertex(vec!["an"]);
@@ -234,8 +226,7 @@ matches!(word.chars().next(), Some('a' | 'e' | 'i' | 'o' | 'u'))
     graph.add_edge(category_noun.clone(), noun1.clone());
     graph.add_edge(category_noun.clone(), noun2.clone());
     graph.add_edge(category_noun.clone(), noun3.clone());
-    
-  
+
     // Adding subjects
     let noun4 = graph.add_vertex(vec!["aeroplane"]);
     let noun5 = graph.add_vertex(vec!["elephant"]);
@@ -244,7 +235,6 @@ matches!(word.chars().next(), Some('a' | 'e' | 'i' | 'o' | 'u'))
     graph.add_edge(category_noun.clone(), noun4.clone());
     graph.add_edge(category_noun.clone(), noun5.clone());
     graph.add_edge(category_noun.clone(), noun6.clone());
-
 
     // Adding verbs
     let verb1 = graph.add_vertex(vec!["eats"]);
@@ -286,7 +276,6 @@ matches!(word.chars().next(), Some('a' | 'e' | 'i' | 'o' | 'u'))
     let dnvdn_paths_1 = graph.traverse_pattern(&pattern_dnvdn_1);
     let filtered_paths = filter_grammatically_incorrect_paths(dnvdn_paths_1);
 
-    
     /*
     dbg!(&all_sentences);
 

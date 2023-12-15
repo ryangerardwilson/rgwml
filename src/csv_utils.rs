@@ -1,6 +1,6 @@
+use csv::Writer;
 use std::error::Error;
 use std::fs::File;
-use csv::Writer;
 
 /// Creates a CSV file at the specified path with the given header.
 ///
@@ -34,4 +34,3 @@ pub fn create_csv(file_path: String, header: &[&str]) -> Result<(), Box<dyn Erro
     println!("CSV file has been created at {}", file_path);
     Ok(())
 }
-

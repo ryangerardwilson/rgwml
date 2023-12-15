@@ -1,7 +1,7 @@
+use csv::Writer;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
-use csv::Writer;
 
 fn create_csv(file_path: String, header: &[&str]) -> Result<(), Box<dyn Error>> {
     let mut file = File::create(file_path)?;
@@ -22,6 +22,8 @@ fn create_csv(file_path: String, header: &[&str]) -> Result<(), Box<dyn Error>> 
 fn main() -> Result<(), Box<dyn Error>> {
     // Call the create_csv function with an absolute path
     let absolute_path = "/home/rgw/Desktop/output.csv"; // Replace with your actual path
-    create_csv(absolute_path.to_string(), &["Column1", "Column2", "Column3"])
+    create_csv(
+        absolute_path.to_string(),
+        &["Column1", "Column2", "Column3"],
+    )
 }
-
