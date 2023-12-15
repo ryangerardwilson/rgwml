@@ -1,10 +1,41 @@
 use serde::ser::StdError;
-use serde_json::{json, Number, Value};
+use serde_json::{json, Map, Number, Value};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-type DataFrame = Vec<HashMap<String, Value>>;
+pub type DataFrame = Vec<HashMap<String, Value>>;
+
+/// Converts a DataFrame into a serde_json Value::Array.
+///
+/// This function takes a DataFrame as input and converts it into a Value::Array,
+/// where each element is a Value::Object constructed from the HashMap entries.
+///
+/// # Arguments
+///
+/// * `data_frame` - A DataFrame to convert.
+///
+/// # Returns
+///
+/// A serde_json Value::Array containing the converted data.
+///
+/// # Example
+///
+/// ```
+/// let df = vec![HashMap::from([("key1".to_string(), Value::String("value1".to_string()))])];
+/// let value_array = data_frame_to_value_array(df);
+/// ```
+pub fn dataframe_to_value_array(data_frame: DataFrame) -> Value {
+    Value::Array(
+        data_frame
+            .into_iter()
+            .map(|hm| {
+                let map: Map<String, Value> = hm.into_iter().collect();
+                Value::Object(map)
+            })
+            .collect(),
+    )
+}
 
 /// Converts a JSON string into a DataFrame.
 ///
@@ -255,4 +286,50 @@ impl Query {
 
         result
     }
+}
+
+/// Groups a DataFrame based on a provided key.
+///
+/// This function groups rows in the given DataFrame based on the value associated
+/// with a specified key. It handles string values directly and converts other types
+/// of values to strings. If the key is not found in a row, an error message is logged.
+///
+/// # Arguments
+/// - `dataframe`: &DataFrame - The dataset to group.
+/// - `key`: &str - The key based on which the grouping is to be done.
+///
+/// # Returns
+/// - HashMap<String, DataFrame> - A HashMap where each key represents a unique value
+///   associated with the specified key in the input rows, and each value is a DataFrame
+///   containing the grouped rows.
+///
+/// # Example
+/// ```
+/// let df = vec![
+///     hashmap! {"zone_map" => Value::String("Zone1".to_string()), "data" => Value::Number(1.into())},
+///     hashmap! {"zone_map" => Value::String("Zone2".to_string()), "data" => Value::Number(2.into())},
+/// ];
+/// let grouped = group_dataframe_by(&df, "zone_map");
+/// // This will group the DataFrame based on the values of "zone_map".
+/// ```
+pub fn group_dataframe_by(dataframe: &DataFrame, key: &str) -> HashMap<String, DataFrame> {
+    let mut grouped_data: HashMap<String, DataFrame> = HashMap::new();
+
+    for row in dataframe {
+        if let Some(value) = row.get(key) {
+            let key_value = match value {
+                Value::String(s) => s.clone(), // Directly use the string value
+                _ => value.to_string(),        // Convert other types to string
+            };
+            grouped_data
+                .entry(key_value)
+                .or_insert_with(Vec::new)
+                .push(row.clone());
+        } else {
+            // Handle the case where the key is not found
+            eprintln!("Key '{}' not found in row", key);
+        }
+    }
+
+    grouped_data
 }
