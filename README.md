@@ -1,8 +1,8 @@
-# RGWML (the Ryan Gerard Wilson AI, Data Science & Machine Learning Crates)
+# RGWML (a Ryan Gerard Wilson AI, Data Science & Machine Learning Library)
 
-This library simplifies data science, ml, and ai operations, including but not limited to the process of creating and handling CSV files. It's designed to be easy to use, and eliminate the need to ever use a GUI tool.
+This library simplifies Data Science, Machine Learning, and Artifical Intelligence operations. It's designed to leverage the best features of RUST, in a manner that is easy to use, and fun to build upon.
 
-This Rust library is a powerful and user-friendly toolkit designed to simplify operations in data science, machine learning, and artificial intelligence. With a focus on eliminating the need for GUI tools, it streamlines tasks such as CSV file handling and API interactions, while also replicating functionalities akin to Python's Pandas library. Additionally, it leverages Rust's native concurrency features for efficient AI and graph theory-based data analysis.
+A powerful and user-friendly toolkit designed to simplify operations in data science, machine learning, and artificial intelligence. With a focus on eliminating the need for GUI tools, it streamlines tasks such as CSV file handling and API interactions, while also replicating functionalities akin to Python's Pandas library. Additionally, it leverages Rust's native concurrency features for efficient AI and graph theory-based data analysis.
 
 ## Modules Overview
 
