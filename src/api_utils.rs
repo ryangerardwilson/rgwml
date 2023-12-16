@@ -1,8 +1,6 @@
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Error, Method, Response};
 use serde::Serialize;
-use serde_json::json;
-use tokio;
 
 pub enum HeaderOption {
     None,

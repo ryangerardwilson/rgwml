@@ -71,7 +71,6 @@ pub struct VpfcGlobals {
     pub value: String,
 }
 
-
 impl Transformer {
     pub fn to_string(&self) -> String {
         match self {
@@ -207,163 +206,159 @@ async fn parallelize_against_training_data<'a>(
         show_complications: &ShowComplications,
         decrement_coefficient: f64,
     ) -> Result<String, Box<dyn Error>> {
+        let message_str = message;
 
+        let split_words: Vec<&str> = message_str.split_whitespace().collect();
 
-            let message_str = message;
-         
-            let split_words: Vec<&str> = message_str.split_whitespace().collect();
+        // let split_words: Vec<&str> = message.split_whitespace().collect();
+        let user_input_length = split_words.len();
+        let mut words = Vec::new();
 
-            // let split_words: Vec<&str> = message.split_whitespace().collect();
-            let user_input_length = split_words.len();
-            let mut words = Vec::new();
+        let min_chunk_size = match split_upto {
+            SplitUpto::WordSetLength(size) => {
+                // Dereference `size` for comparison
 
-            let min_chunk_size = match split_upto {
-                SplitUpto::WordSetLength(size) => {
-                    // Dereference `size` for comparison
-
-                    if *size == 0 || *size >= user_input_length {
-                        user_input_length // Consider the entire user input
-                    } else {
-                        *size // Dereference to match the type of user_input_length
-                    }
-                }
-            };
-
-            for chunk_size in min_chunk_size..=user_input_length {
-                for start in 0..split_words.len() {
-                    let end = std::cmp::min(start + chunk_size, split_words.len());
-                    if end > start {
-                        // Adjusted condition to allow single-word chunks
-                        words.push(split_words[start..end].join(" "));
-                    }
+                if *size == 0 || *size >= user_input_length {
+                    user_input_length // Consider the entire user input
+                } else {
+                    *size // Dereference to match the type of user_input_length
                 }
             }
+        };
 
-            // dbg!(&words, &data_arc);
-            //dbg!(&words.len());
-            //dbg!(&data_arc.len());
-
-            let total_arc_items = data_arc.len();
-            let total_combinations = words.len();
-
-            // If you want to calculate tasks considering both word combinations and dictionary entries
-            let total_concurrent_tasks = total_combinations * total_arc_items;
-
-            if let ShowComplications::True = show_complications {
-                println!(
-                    "Total concurrent ({} tasks): {}",
-                    task_name, total_concurrent_tasks
-                );
+        for chunk_size in min_chunk_size..=user_input_length {
+            for start in 0..split_words.len() {
+                let end = std::cmp::min(start + chunk_size, split_words.len());
+                if end > start {
+                    // Adjusted condition to allow single-word chunks
+                    words.push(split_words[start..end].join(" "));
+                }
             }
+        }
 
-            let word_and_phrase_futures: Vec<_> = words
-                .iter()
-                .map(|word| {
-                    let data_arc_clone = Arc::clone(&data_arc);
-                    process_item(
-                        word.clone(),
-                        data_arc_clone,
-                        user_input_length,
-                        &task_name,
-                        //&adjustment_basis,
-                        &show_complications,
-                    )
-                })
-                .collect();
+        // dbg!(&words, &data_arc);
+        //dbg!(&words.len());
+        //dbg!(&data_arc.len());
 
-            let results = join_all(word_and_phrase_futures).await;
+        let total_arc_items = data_arc.len();
+        let total_combinations = words.len();
 
-            // dbg!(&results);
-            match call_type {
-                CallType::Parallel => {
-                    let mut max_similarity_per_output: HashMap<String, SimilarityResult> =
-                        HashMap::new();
+        // If you want to calculate tasks considering both word combinations and dictionary entries
+        let total_concurrent_tasks = total_combinations * total_arc_items;
 
-                    for result_option in results {
-                        if let Some(result) = result_option {
-                            let output = result.output.clone(); // Clone the output to use as a key
+        if let ShowComplications::True = show_complications {
+            println!(
+                "Total concurrent ({} tasks): {}",
+                task_name, total_concurrent_tasks
+            );
+        }
 
-                            // Every result is now considered for insertion or update, without checking similarity
-                            if let Some(entry) = max_similarity_per_output.get_mut(&output) {
-                                // Update the entry if the current result has a higher similarity
-                                if result.adjusted_similarity > entry.adjusted_similarity {
-                                    *entry = result.clone(); // Clone the result for insertion
-                                }
-                            } else {
-                                // Insert the result if no entry exists for this output
-                                max_similarity_per_output.insert(output, result.clone());
+        let word_and_phrase_futures: Vec<_> = words
+            .iter()
+            .map(|word| {
+                let data_arc_clone = Arc::clone(&data_arc);
+                process_item(
+                    word.clone(),
+                    data_arc_clone,
+                    user_input_length,
+                    &task_name,
+                    //&adjustment_basis,
+                    &show_complications,
+                )
+            })
+            .collect();
+
+        let results = join_all(word_and_phrase_futures).await;
+
+        // dbg!(&results);
+        match call_type {
+            CallType::Parallel => {
+                let mut max_similarity_per_output: HashMap<String, SimilarityResult> =
+                    HashMap::new();
+
+                for result_option in results {
+                    if let Some(result) = result_option {
+                        let output = result.output.clone(); // Clone the output to use as a key
+
+                        // Every result is now considered for insertion or update, without checking similarity
+                        if let Some(entry) = max_similarity_per_output.get_mut(&output) {
+                            // Update the entry if the current result has a higher similarity
+                            if result.adjusted_similarity > entry.adjusted_similarity {
+                                *entry = result.clone(); // Clone the result for insertion
                             }
+                        } else {
+                            // Insert the result if no entry exists for this output
+                            max_similarity_per_output.insert(output, result.clone());
                         }
                     }
+                }
 
-                    // Extract the values (SimilarityResults) from the map and collect them into a Vec
-                    let filtered_results: Vec<_> =
-                        max_similarity_per_output.values().cloned().collect();
+                // Extract the values (SimilarityResults) from the map and collect them into a Vec
+                let filtered_results: Vec<_> =
+                    max_similarity_per_output.values().cloned().collect();
 
-                    // Optionally sort and take the top 3 results based on adjusted_similarity
-                    let mut sorted_filtered_results = filtered_results;
-                    sorted_filtered_results.sort_by(|a, b| {
-                        b.adjusted_similarity
-                            .partial_cmp(&a.adjusted_similarity)
+                // Optionally sort and take the top 3 results based on adjusted_similarity
+                let mut sorted_filtered_results = filtered_results;
+                sorted_filtered_results.sort_by(|a, b| {
+                    b.adjusted_similarity
+                        .partial_cmp(&a.adjusted_similarity)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+
+                let top_results = sorted_filtered_results
+                    .into_iter()
+                    .take(3)
+                    .map(|mut result| {
+                        result.adjusted_similarity *= 1.0f32 - decrement_coefficient as f32;
+                        result
+                    })
+                    .collect::<Vec<_>>();
+
+                if !top_results.is_empty() {
+                    // Serialize the top results into a JSON string
+                    let json = serde_json::to_string(&top_results)?;
+                    Ok(json)
+                } else {
+                    Err("No suitable results found for Parallel call type".into())
+                }
+            }
+
+            CallType::Linear => {
+                let best_output = results
+                    .into_iter()
+                    .filter_map(|result| result) // filter out None results
+                    .max_by(|a, b| {
+                        a.adjusted_similarity
+                            .partial_cmp(&b.adjusted_similarity)
                             .unwrap_or(std::cmp::Ordering::Equal)
                     });
 
-                    let top_results = sorted_filtered_results
-                        .into_iter()
-                        .take(3)
-                        .map(|mut result| {
-                            result.adjusted_similarity *= 1.0f32 - decrement_coefficient as f32;
-                            result
-                        })
-                        .collect::<Vec<_>>();
+                if let Some(best_similarity_result) = best_output {
+                    let mut best_similarity_result = best_similarity_result;
 
-                    if !top_results.is_empty() {
-                        // Serialize the top results into a JSON string
-                        let json = serde_json::to_string(&top_results)?;
-                        Ok(json)
-                    } else {
-                        Err("No suitable results found for Parallel call type".into())
-                    }
-                }
-
-                CallType::Linear => {
-                    let best_output = results
-                        .into_iter()
-                        .filter_map(|result| result) // filter out None results
-                        .max_by(|a, b| {
-                            a.adjusted_similarity
-                                .partial_cmp(&b.adjusted_similarity)
-                                .unwrap_or(std::cmp::Ordering::Equal)
-                        });
-
-                    if let Some(best_similarity_result) = best_output {
-                        let mut best_similarity_result = best_similarity_result;
-
-                        best_similarity_result.adjusted_similarity *=
-                            1.0f32 - decrement_coefficient as f32;
-                        // Wrap the best result in an array
-                        let wrapped_result = vec![best_similarity_result];
-                        // Serialize the wrapped result into a JSON string
-                        let json = serde_json::to_string(&wrapped_result)?;
-                        Ok(json)
-                    } else {
-                        // Handle the case where no valid results were found
-                        Err("No user message found in the conversation".into())
-                    }
+                    best_similarity_result.adjusted_similarity *=
+                        1.0f32 - decrement_coefficient as f32;
+                    // Wrap the best result in an array
+                    let wrapped_result = vec![best_similarity_result];
+                    // Serialize the wrapped result into a JSON string
+                    let json = serde_json::to_string(&wrapped_result)?;
+                    Ok(json)
+                } else {
+                    // Handle the case where no valid results were found
+                    Err("No user message found in the conversation".into())
                 }
             }
-        } 
-
+        }
+    }
 
     let data_arc = Arc::new(neural_associations);
-
 
     let mut futures = Vec::new();
 
     let mut decrement = 0.0;
 
     //for message in conversation_messages.iter() {
-    
+
     let data_arc_clone = Arc::clone(&data_arc);
     let future = process_message_concurrently(
         text_in_focus,
@@ -413,28 +408,27 @@ async fn parallelize_against_training_data<'a>(
 
 #[tokio::main] // or #[async_std::main] depending on the async runtime you're using
 async fn main() {
+    let task_name = "test1";
 
-let task_name = "test1";
+    let text_in_focus = "nput";
 
-let text_in_focus = "nput";
+    let dummy_associations = vec![
+        NeuralAssociations2 {
+            input: "Input 1".to_string(),
+            output: "Output 1".to_string(),
+        },
+        NeuralAssociations2 {
+            input: "Input 2".to_string(),
+            output: "Output 2".to_string(),
+        },
+        NeuralAssociations2 {
+            input: "Input 3".to_string(),
+            output: "Output 3".to_string(),
+        },
+        // Add more associations as needed
+    ];
 
-let dummy_associations = vec![
-    NeuralAssociations2 {
-        input: "Input 1".to_string(),
-        output: "Output 1".to_string(),
-    },
-    NeuralAssociations2 {
-        input: "Input 2".to_string(),
-        output: "Output 2".to_string(),
-    },
-    NeuralAssociations2 {
-        input: "Input 3".to_string(),
-        output: "Output 3".to_string(),
-    },
-    // Add more associations as needed
-];
-
-    let result =     parallelize_against_training_data(
+    let result = parallelize_against_training_data(
         &dummy_associations,
         text_in_focus,
         task_name,
@@ -446,7 +440,4 @@ let dummy_associations = vec![
     .await;
 
     dbg!(result);
-
-
-
 }
