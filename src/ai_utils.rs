@@ -1,15 +1,15 @@
 use futures::future::join_all;
-use futures::join;
+//use futures::join;
 use fuzzywuzzy::fuzz;
-use regex::Regex;
+//use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+//use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::Mutex;
+// use std::sync::Mutex;
 
 /// The `NeuralAssociations2D` struct represents a basic structure for a two-dimensional neural network model.
 /// It consists of two primary fields: `input` and `output`. These fields are designed to work with string representations
@@ -109,7 +109,7 @@ pub enum WordLengthSensitivityCoefficient {
     Coefficient(f32),
 }
 
-/// `fuzzAI` is an asynchronous function designed to process a batch of
+/// `fuzzai` is an asynchronous function designed to process a batch of
 /// neural associations in parallel, applying a two-dimensional analysis based on the provided parameters.
 /// This function helps in understanding the inner workings of the neural network's
 /// decision-making process in a concurrent environment.
@@ -129,7 +129,7 @@ pub enum WordLengthSensitivityCoefficient {
 ///
 /// ## Using `None` for `WordLengthSensitivityCoefficient`
 /// ```rust
-/// let result = fuzzAI(
+/// let result = fuzzai(
 ///     &neural_associations,
 ///     "Example text",
 ///     "Sample Task",
@@ -141,7 +141,7 @@ pub enum WordLengthSensitivityCoefficient {
 ///
 /// ## Using a `Coefficient` value
 /// ```rust
-/// let result = fuzzAI(
+/// let result = fuzzai(
 ///     &neural_associations,
 ///     "Example text",
 ///     "Sample Task",
@@ -153,7 +153,7 @@ pub enum WordLengthSensitivityCoefficient {
 ///
 /// # Returns
 /// - A `Result` containing a `String` upon success, or an error wrapped in a `Box<dyn Error>` upon failure.
-pub async fn fuzzAI<'a>(
+pub async fn fuzzai<'a>(
     neural_associations: &'a [NeuralAssociations2D],
     text_in_focus: &str,
     task_name: &str,
@@ -176,23 +176,11 @@ pub async fn fuzzAI<'a>(
             let items_to_process_lower = items_to_process.to_lowercase();
 
             let similarity = fuzz::ratio(&items_to_process_lower, &row.input);
-            /*
-            // let similarity = fuzz::ratio(&items_to_process, &row.input);
-            let word_count_diff = (user_input_length as i32 - input_word_count as i32).abs();
-            let adjusted_similarity = similarity as f32 - (similarity as f32 * 0.10 * word_count_diff as f32);
-
-            if let ShowComplications::True = show_complications {
-                println!(
-                    "Comparing ({}) '{}' with '{}' - Similarity: {}; Word Count Adjustment: {}",
-                    &task_name, &items_to_process, &row.input, similarity, &adjusted_similarity
-                );
-            }
-            */
 
             match word_length_sensitivity {
                 WordLengthSensitivityCoefficient::None => {
                     // No adjustment for word length differences
-                    let adjusted_similarity = similarity as f32;
+                    // let adjusted_similarity = similarity as f32;
                     if let ShowComplications::True = show_complications {
                         println!(
                             "Comparing ({}) '{}' with '{}' - Similarity: {}",
