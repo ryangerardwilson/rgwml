@@ -6,14 +6,6 @@ This Rust library is a powerful and user-friendly toolkit designed to simplify o
 
 ## Modules Overview
 
-### `api_utils`
-- **Purpose**: Helper functions for making API calls.
-- **Features**: Simplify the process of sending various HTTP requests and handling responses.
-
-### `csv_utils`
-- **Purpose**: Functions to analyze and manipulate CSV data.
-- **Features**: Read, write, and process CSV files with ease, making data analysis more efficient.
-
 ### `df_utils`
 - **Purpose**: Replicate Python Pandas library functionality in Rust.
 - **Features**: Data manipulation and transformation, filtering, sorting, and aggregating datasets.
@@ -22,10 +14,18 @@ This Rust library is a powerful and user-friendly toolkit designed to simplify o
 - **Purpose**: Leverage Rust's concurrency for AI/Graph Theory based analysis.
 - **Features**: Perform complex data analyses and process neural associations in parallel, harnessing Rust's performance and safety.
 
+### `api_utils`
+- **Purpose**: Helper functions for making API calls.
+- **Features**: Simplify the process of sending various HTTP requests and handling responses.
+
+### `csv_utils`
+- **Purpose**: Functions to analyze and manipulate CSV data.
+- **Features**: Read, write, and process CSV files with ease, making data analysis more efficient.
+
 ## Quick Start
 
 1. Add the library to your `Cargo.toml`.
 2. Import the modules you need in your Rust application:
 
 ```rust
-use rust_data_science_ai_lib::{api_utils, csv_utils, df_utils, ai_utils};
+use rgwml::{api_utils, csv_utils, df_utils, ai_utils};

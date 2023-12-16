@@ -8,14 +8,6 @@
 //!
 //! ## Modules Overview
 //!
-//! ### `api_utils`
-//! - **Purpose**: Helper functions for making API calls.
-//! - **Features**: Simplify the process of sending various HTTP requests and handling responses.
-//!
-//! ### `csv_utils`
-//! - **Purpose**: Functions to analyze and manipulate CSV data.
-//! - **Features**: Read, write, and process CSV files with ease, making data analysis more efficient.
-//!
 //! ### `df_utils`
 //! - **Purpose**: Replicate Python Pandas library functionality in Rust.
 //! - **Features**: Data manipulation and transformation, filtering, sorting, and aggregating datasets.
@@ -24,74 +16,19 @@
 //! - **Purpose**: Leverage Rust's concurrency for AI/Graph Theory based analysis.
 //! - **Features**: Perform complex data analyses and process neural associations in parallel, harnessing Rust's performance and safety.
 //!
+//! ### `api_utils`
+//! - **Purpose**: Helper functions for making API calls.
+//! - **Features**: Simplify the process of sending various HTTP requests and handling responses.
+//!
+//! ### `csv_utils`
+//! - **Purpose**: Functions to analyze and manipulate CSV data.
+//! - **Features**: Read, write, and process CSV files with ease, making data analysis more efficient.
+//!
 //! ## Quick Start
 //! - Add the library to your `Cargo.toml`.
 //! - Import the modules you need in your Rust application:
 //!
 //! ## Examples
-//!
-//! ### ai_utils
-//!
-//! Dive into the world of AI with `fuzzai`, an asynchronous function that processes neural associations in parallel. Imagine analyzing the neural network's decision-making process in a world where AI has developed a fondness for classic video games!
-//! 
-//! ```rust
-//! use rgwml::ai_utils::fuzzai;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!     let neural_associations = vec![
-//!         NeuralAssociation2D {
-//!             input: "Pac-Man starts",
-//!             output: "Collect dots, avoid ghosts",
-//!         },
-//!         NeuralAssociation2D {
-//!             input: "Ghosts in scatter mode",
-//!             output: "Focus on dots in corners",
-//!         },
-//!         // ... more associations ...
-//!     ];
-//!     let result = fuzzai(
-//!         &neural_associations,
-//!         "Just started Pac-Man game. What to do?",
-//!         "Retro Gaming Analysis",
-//!         SplitUpto::WordSetLength(3),
-//!         ShowComplications::True,
-//!         WordLengthSensitivityCoefficient::Coefficient(1.0)
-//!     ).await.expect("AI should understand Pac-Man!");
-//!     println!("AI's take on Pac-Man: {}", result);
-//! }
-//! ```
-//!
-//! ### api_utils
-//! 
-//! Send a request to an API that tells you the current weather on Mars! This function is perfect for interplanetary weather enthusiasts or anyone curious about the Red Planet's climate.
-//! 
-//! ```
-//! use reqwest::Method;
-//! use rgwml::api_utils::call_api;
-//!
-//! #[tokio::main]
-//! async fn main() {
-//!     let mars_weather_api = "https://api.marsweather.app";
-//!     let response = call_api(Method::GET, mars_weather_api, HeaderOption::None, None::<()>).await
-//!         .expect("Failed to get Mars weather. Are the satellites okay?");
-//!     println!("Current weather on Mars: {}", response);
-//! }
-//! ```
-//!
-//! ### csv_utils
-//! 
-//! Create a CSV file listing the top 5 fictional spaceships. This example is perfect for sci-fi fans who like to keep track of their favorite spacecraft.
-//! 
-//! ```
-//! use rgwml::csv_utils::create_csv;
-//!
-//! fn main() {
-//!     let spaceships = ["Millennium Falcon", "Starship Enterprise", "Serenity", "Battlestar Galactica", "TARDIS"];
-//!     let result = create_csv("/path/to/spaceships.csv", &spaceships);
-//!     assert!(result.is_ok(), "Failed to save the coolest spaceships. Try again!");
-//! }
-//! ```
 //!
 //! ### df_utils
 //! 
@@ -157,15 +94,78 @@
 //!     println!("High Magic Level Forests: {:?}", high_magic_forests);
 //! }
 //! ```
+//! ### ai_utils
+//!
+//! Dive into the world of AI with `fuzzai`, an asynchronous function that processes neural associations in parallel. Imagine analyzing the neural network's decision-making process in a world where AI has developed a fondness for classic video games!
+//! 
+//! ```rust
+//! use rgwml::ai_utils::{NeuralAssociation2D, fuzzai};
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let neural_associations = vec![
+//!         NeuralAssociation2D {
+//!             input: "Pac-Man starts",
+//!             output: "Collect dots, avoid ghosts",
+//!         },
+//!         NeuralAssociation2D {
+//!             input: "Ghosts in scatter mode",
+//!             output: "Focus on dots in corners",
+//!         },
+//!         // ... more associations ...
+//!     ];
+//!     let result = fuzzai(
+//!         &neural_associations,
+//!         "Just started Pac-Man game. What to do?",
+//!         "Retro Gaming Analysis",
+//!         SplitUpto::WordSetLength(3),
+//!         ShowComplications::True,
+//!         WordLengthSensitivityCoefficient::Coefficient(1.0)
+//!     ).await.expect("AI should understand Pac-Man!");
+//!     println!("AI's take on Pac-Man: {}", result);
+//! }
+//! ```
+//!
+//! ### api_utils
+//! 
+//! Send a request to an API that tells you the current weather on Mars! This function is perfect for interplanetary weather enthusiasts or anyone curious about the Red Planet's climate.
+//! 
+//! ```
+//! use reqwest::Method;
+//! use rgwml::api_utils::call_api;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let mars_weather_api = "https://api.marsweather.app";
+//!     let response = call_api(Method::GET, mars_weather_api, HeaderOption::None, None::<()>).await
+//!         .expect("Failed to get Mars weather. Are the satellites okay?");
+//!     println!("Current weather on Mars: {}", response);
+//! }
+//! ```
+//!
+//! ### csv_utils
+//! 
+//! Create a CSV file listing the top 5 fictional spaceships. This example is perfect for sci-fi fans who like to keep track of their favorite spacecraft.
+//! 
+//! ```
+//! use rgwml::csv_utils::create_csv;
+//!
+//! fn main() {
+//!     let spaceships = ["Millennium Falcon", "Starship Enterprise", "Serenity", "Battlestar Galactica", "TARDIS"];
+//!     let result = create_csv("/path/to/spaceships.csv", &spaceships);
+//!     assert!(result.is_ok(), "Failed to save the coolest spaceships. Try again!");
+//! }
+//! ```
+//!
 //! For more detailed examples, refer to the documentation of each module.
 //!
 //! ## License
 //!
 //! This project is licensed under the MIT License - see the LICENSE file for details.
 
+pub mod df_utils;
 pub mod ai_utils;
 pub mod api_utils;
 pub mod csv_utils;
-pub mod df_utils;
 
 
