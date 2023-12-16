@@ -1,10 +1,12 @@
 [package]
 name = "rgwml"
-version = "0.1.81"
+version = "0.1.82"
 edition = "2021"
 author = "Ryan Gerard Wilson"
 description = "A crate for reducing cognitive overload while using rust for ml, ai, and data science operations"
 license = "MIT"
+repository = "https://github.com/ryangerardwilson/rgwml"
+
 
 [dependencies]
 ndarray = "0.15"
