@@ -1,7 +1,7 @@
 // lib.rs
 
 
-//! # RGWML (a Ryan Gerard Wilson AI, Data Science & Machine Learning Library)
+//! # RGWML (an AI, Data Science & Machine Learning Library designed to minimize developer cognitive load)
 //!
 //! This library simplifies Data Science, Machine Learning, and Artifical Intelligence operations. It's designed to leverage the best features of RUST, in a manner that is easy to use, and fun to build upon.
 //!
