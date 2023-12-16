@@ -93,7 +93,7 @@ pub enum SplitUpto {
     WordSetLength(usize),
 }
 
-/// `WordLengthSensitivityCoefficient` provides a mechanism to adjust the neural network's sensitivity
+/// `WordLengthSensitivity` provides a mechanism to adjust the neural network's sensitivity
 /// to the length of words in its processing. This can be crucial in scenarios where the size or length
 /// of textual input significantly impacts the network's performance or accuracy.
 ///
@@ -104,7 +104,7 @@ pub enum SplitUpto {
 ///   coefficient of 0 implies no sensitivity, while 1 implies maximum sensitivity. The coefficient
 ///   scales the impact of word length differences on the network's processing, allowing for nuanced
 ///   adjustments tailored to specific use cases.
-pub enum WordLengthSensitivityCoefficient {
+pub enum WordLengthSensitivity {
     None,
     Coefficient(f32),
 }
@@ -123,11 +123,11 @@ pub enum WordLengthSensitivityCoefficient {
 ///   a text "I am a good boy" will be split into "I am", "am a", "a good", "good boy" and all larger permutations.
 /// - `show_complications`: A `ShowComplications` enum to control the verbosity of the function. When set to `True`,
 ///   it prints detailed information about all concurrent decisions made during the function's execution.
-/// - `word_length_sensitivity`: A `WordLengthSensitivityCoefficient` to adjust processing based on word length.
+/// - `word_length_sensitivity`: A `WordLengthSensitivity` to adjust processing based on word length.
 ///
 /// # Examples
 ///
-/// ## Using `None` for `WordLengthSensitivityCoefficient`
+/// ## Using `None` for `WordLengthSensitivity`
 /// ```rust
 /// let result = fuzzai(
 ///     &neural_associations,
@@ -135,7 +135,7 @@ pub enum WordLengthSensitivityCoefficient {
 ///     "Sample Task",
 ///     SplitUpto::WordSetLength(5),
 ///     ShowComplications::False,
-///     WordLengthSensitivityCoefficient::None
+///     WordLengthSensitivity::None
 /// ).await?;
 /// ```
 ///
@@ -147,7 +147,7 @@ pub enum WordLengthSensitivityCoefficient {
 ///     "Sample Task",
 ///     SplitUpto::WordSetLength(5),
 ///     ShowComplications::True,
-///     WordLengthSensitivityCoefficient::Coefficient(0.5)
+///     WordLengthSensitivity::Coefficient(0.5)
 /// ).await?;
 /// ```
 ///
@@ -159,7 +159,7 @@ pub async fn fuzzai<'a>(
     task_name: &str,
     split_upto: SplitUpto,
     show_complications: ShowComplications,
-    word_length_sensitivity: WordLengthSensitivityCoefficient,
+    word_length_sensitivity: WordLengthSensitivity,
 ) -> Result<String, Box<dyn Error>> {
     async fn process_item(
         items_to_process: String,
@@ -167,7 +167,7 @@ pub async fn fuzzai<'a>(
         user_input_length: usize,
         task_name: &str,
         show_complications: &ShowComplications,
-        word_length_sensitivity: &WordLengthSensitivityCoefficient,
+        word_length_sensitivity: &WordLengthSensitivity,
     ) -> Option<SimilarityResult> {
         let mut all_futures: Vec<Pin<Box<dyn Future<Output = SimilarityResult>>>> = Vec::new();
 
@@ -178,7 +178,7 @@ pub async fn fuzzai<'a>(
             let similarity = fuzz::ratio(&items_to_process_lower, &row.input);
 
             match word_length_sensitivity {
-                WordLengthSensitivityCoefficient::None => {
+                WordLengthSensitivity::None => {
                     // No adjustment for word length differences
                     // let adjusted_similarity = similarity as f32;
                     if let ShowComplications::True = show_complications {
@@ -195,7 +195,7 @@ pub async fn fuzzai<'a>(
                         }
                     }));
                 }
-                WordLengthSensitivityCoefficient::Coefficient(coefficient) => {
+                WordLengthSensitivity::Coefficient(coefficient) => {
                     // Ensure coefficient is within the range 0 to 1
                     let clamped_coefficient = coefficient.clamp(0.0, 1.0);
                     let word_count_diff =
@@ -220,16 +220,6 @@ pub async fn fuzzai<'a>(
                 }
             }
 
-            /*
-            all_futures.push(Box::pin(async move {
-                SimilarityResult {
-                    // adjusted_similarity: similarity as f32 - (similarity as f32 * 0.10 * word_count_diff as f32),
-                    adjusted_similarity: similarity as f32,
-                    input: row.input.to_string(),
-                    output: row.output.to_string(),
-                }
-            }));
-            */
         }
 
         let results = join_all(all_futures).await;
@@ -249,7 +239,7 @@ pub async fn fuzzai<'a>(
         split_upto: &SplitUpto,
         task_name: &str,
         show_complications: &ShowComplications,
-        word_length_sensitivity: &WordLengthSensitivityCoefficient,
+        word_length_sensitivity: &WordLengthSensitivity,
     ) -> Result<String, Box<dyn Error>> {
         let message_str = message;
 

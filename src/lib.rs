@@ -121,7 +121,7 @@
 //!         "Retro Gaming Analysis",
 //!         SplitUpto::WordSetLength(3),
 //!         ShowComplications::True,
-//!         WordLengthSensitivityCoefficient::Coefficient(1.0)
+//!         WordLengthSensitivity::Coefficient(0.25)
 //!     ).await.expect("AI should understand Pac-Man!");
 //!     println!("AI's take on Pac-Man: {}", result);
 //! }
