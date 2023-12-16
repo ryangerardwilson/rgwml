@@ -1,10 +1,5 @@
 // lib.rs
 
-pub mod ai_utils;
-pub mod api_utils;
-pub mod csv_utils;
-pub mod df_utils;
-
 
 //! # RGWML (the Ryan Gerard Wilson AI, Data Science & Machine Learning Crates)
 //!
@@ -167,4 +162,10 @@ pub mod df_utils;
 //! ## License
 //!
 //! This project is licensed under the MIT License - see the LICENSE file for details.
+
+pub mod ai_utils;
+pub mod api_utils;
+pub mod csv_utils;
+pub mod df_utils;
+
 
