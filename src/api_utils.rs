@@ -116,7 +116,19 @@ impl ApiCallBuilder {
     }
 
     pub async fn execute(self) -> Result<String, Box<dyn StdError>> {
-        // Check and handle cache...
+        if let Some(cache_path) = &self.cache_path {
+            if let Ok(metadata) = fs::metadata(cache_path) {
+                if let Ok(modified) = metadata.modified() {
+                    if let Ok(duration) = modified.elapsed() {
+                        if duration.as_secs() / 60 < self.cache_duration.unwrap_or(0) {
+                            println!("Fetching data from cache.");
+                            return fs::read_to_string(cache_path)
+                                .map_err(|e| Box::new(e) as Box<dyn StdError>);
+                        }
+                    }
+                }
+            }
+        }
 
         println!("Making a new API call.");
         let client = Client::new();
