@@ -1,15 +1,11 @@
 use futures::future::join_all;
-//use futures::join;
 use fuzzywuzzy::fuzz;
-//use regex::Regex;
 use serde::{Deserialize, Serialize};
-//use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-// use std::sync::Mutex;
 
 /// The `NeuralAssociations2D` struct represents a basic structure for a two-dimensional neural network model.
 /// It consists of two primary fields: `input` and `output`. These fields are designed to work with string representations

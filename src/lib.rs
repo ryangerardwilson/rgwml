@@ -1,12 +1,8 @@
 // lib.rs
-
-
 //! # RGWML (an AI, Data Science & Machine Learning Library designed to minimize developer cognitive load)
 //!
-//! This library simplifies Data Science, Machine Learning, and Artifical Intelligence operations. It's designed to leverage the best features of RUST, in a manner that is easy to use, and fun to build upon.
-//!
-//! A powerful and user-friendly toolkit designed to simplify operations in data science, machine learning, and artificial intelligence. With a focus on eliminating the need for GUI tools, it streamlines tasks such as CSV file handling and API interactions, while also replicating functionalities akin to Python's Pandas library. Additionally, it leverages Rust's native concurrency features for efficient AI and graph theory-based data analysis.
-//!
+//! This library simplifies Data Science, Machine Learning, and Artifical Intelligence operations. It's designed to leverage the best features of RUST, in a manner that is graceful, elegant, and ticklishly fun to build upon.
+//! 
 //! ## Modules Overview
 //!
 //! ### `df_utils`
@@ -128,37 +124,88 @@
 //! ```
 //!
 //! ### api_utils
-//! 
-//! Send a request to an API that tells you the current weather on Mars! This function is perfect for interplanetary weather enthusiasts or anyone curious about the Red Planet's climate.
-//! 
+//!
+//! This module features the APICallBuilder a fluent interface for building API requests with support for method chaining. It features an option for including custom headers via the `HeaderOption` enum. The `HeaderOption::Set` variant takes a `JsonValue`, allowing you to specify headers in JSON format. These headers are then converted and inserted into the request. If caching is enabled, responses are stored and reused for subsequent requests made within the specified cache duration.
+//!
+//! Example 1: Without Headers
 //! ```
 //! use reqwest::Method;
-//! use rgwml::api_utils::call_api;
+//! use serde_json::json;
+//! use rgwml::api_utils::{ApiCallBuilder, HeaderOption};
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let mars_weather_api = "https://api.marsweather.app";
-//!     let response = call_api(Method::GET, mars_weather_api, HeaderOption::None, None::<()>).await
-//!         .expect("Failed to get Mars weather. Are the satellites okay?");
-//!     println!("Current weather on Mars: {}", response);
+//!     let url = "http://example.com/api/submit";
+//!     let payload = json!({
+//!         "field1": "Hello",
+//!         "field2": 123
+//!     });
+//!     let response = ApiCallBuilder::call(
+//!             Method::POST,
+//!             url,
+//!             HeaderOption::None, // No custom headers
+//!             Some(payload)
+//!         )
+//!         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
+//!         .execute()
+//!         .await
+//!         .unwrap();
+//!
+//!     println!("Response from server: {}", response);
 //! }
+//! ```
+//!
+//! Example 2: With Headers
+//! ```
+//! use reqwest::Method;
+//! use serde_json::json;
+//! use rgwml::api_utils::{ApiCallBuilder, HeaderOption};
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let url = "http://example.com/api/submit";
+//!     let headers = json!({
+//!         "Content-Type": "application/json",
+//!         "Authorization": "Bearer token123"
+//!     });
+//!     let payload = json!({
+//!         "field1": "Hello",
+//!         "field2": 123
+//!     });
+//!     let response = ApiCallBuilder::call(
+//!             Method::POST,
+//!             url,
+//!             HeaderOption::Set(headers), // Custom headers set
+//!             Some(payload)
+//!         )
+//!         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
+//!         .execute()
+//!         .await
+//!         .unwrap();
+//!
+//!     println!("Response from server: {}", response);
+//! }
+//! ```
+//!
+//! In the second example, the `HeaderOption::Set` variant is used to specify custom headers in JSON format. These headers are processed and applied to the request.
+//!
+//! Note: Be cautious when caching POST requests, as they typically send unique data each time. Caching is most effective when the same request is likely to yield the same response.
 //! ```
 //!
 //! ### csv_utils
 //! 
-//! Create a CSV file listing the top 5 fictional spaceships. This example is perfect for sci-fi fans who like to keep track of their favorite spacecraft.
-//! 
-//! ```
-//! use rgwml::csv_utils::create_csv;
+//! This module features the CsvBuilder, a fluent interface for creating and writing to CSV files. 
 //!
-//! fn main() {
-//!     let spaceships = ["Millennium Falcon", "Starship Enterprise", "Serenity", "Battlestar Galactica", "TARDIS"];
-//!     let result = create_csv("/path/to/spaceships.csv", &spaceships);
-//!     assert!(result.is_ok(), "Failed to save the coolest spaceships. Try again!");
-//! }
+//! ```
+//! use rgwml::csv_utils::CsvBuilder;
+//!
+//! let result = CsvBuilder::new("/path/to/your/file.csv")
+//!     .set_header(&["Column1", "Column2", "Column3"])
+//!     .add_row(&["Row1-1", "Row1-2", "Row1-3"])
+//!     .add_rows(&[&["Row2-1", "Row2-2", "Row2-3"], &["Row3-1", "Row3-2", "Row3-3"]]);
 //! ```
 //!
-//! For more detailed examples, refer to the documentation of each module.
+//! This example demonstrates creating a new CSV file, setting its header, adding individual rows, and a collection of rows. The builder pattern allows for these methods to be chained for ease of use.
 //!
 //! ## License
 //!

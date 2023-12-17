@@ -1,36 +1,103 @@
+// csv_utils.rs
 use csv::Writer;
 use std::error::Error;
 use std::fs::File;
+use std::io::{self, Write};
 
-/// Creates a CSV file at the specified path with the given header.
+/// A flexible builder for creating and writing to CSV files.
 ///
-/// # Arguments
-///
-/// * `file_path` - A string specifying the path where the CSV file will be created.
-/// * `header` - A slice of strings representing the header row of the CSV file.
-///
-/// # Returns
-///
-/// This function returns a `Result<(), Box<dyn Error>>`. On success, it returns `Ok(())`.
-/// On failure, it returns an error wrapped in a `Box<dyn Error>`.
+/// This struct allows for a fluent interface to build and write to a CSV file,
+/// supporting method chaining. It uses a generic writer to handle different types
+/// of outputs, primarily working with file-based writing.
 ///
 /// # Examples
 ///
-/// ```
-/// use rgwml::csv_utils::create_csv;
+/// Basic usage:
 ///
-/// let result = create_csv("/path/to/output.csv".to_string(), &["Column1", "Column2", "Column3"]);
-/// assert!(result.is_ok());
 /// ```
-pub fn create_csv(file_path: String, header: &[&str]) -> Result<(), Box<dyn Error>> {
-    let file = File::create(&file_path)?;
+/// use rgwml::csv_utils::CsvBuilder;
+///
+/// let result = CsvBuilder::new("/path/to/your/file.csv")
+///     .set_header(&["Column1", "Column2", "Column3"])
+///     .add_row(&["Row1-1", "Row1-2", "Row1-3"])
+///     .add_rows(&[&["Row2-1", "Row2-2", "Row2-3"], &["Row3-1", "Row3-2", "Row3-3"]]);
+/// ```
+///
+/// This example demonstrates creating a new CSV file, setting its header,
+/// adding individual rows, and a collection of rows. The builder pattern allows
+/// for these methods to be chained for ease of use.
+pub struct CsvBuilder {
+    writer: Writer<Box<dyn Write>>,
+    error: Option<Box<dyn Error>>,
+    file_path: String,
+}
 
-    let mut wtr = Writer::from_writer(file);
+impl CsvBuilder {
+    /// Creates a new CsvBuilder for the specified file path.
+    pub fn new(file_path: &str) -> Self {
+        let writer: Box<dyn Write> = match File::create(file_path) {
+            Ok(file) => Box::new(file),
+            Err(e) => {
+                return CsvBuilder { 
+                    writer: Writer::from_writer(Box::new(io::sink())), 
+                    error: Some(Box::new(e)),
+                    file_path: file_path.to_string(),
+                };
+            }
+        };
+        CsvBuilder { 
+            writer: Writer::from_writer(writer), 
+            error: None,
+            file_path: file_path.to_string(),
+        }
+    }
+    /// Sets the header of the CSV file.
+    pub fn set_header(mut self, header: &[&str]) -> Self {
+        if self.error.is_none() {
+            if let Err(e) = self.writer.write_record(header) {
+                self.error = Some(Box::new(e));
+            }
+        }
+        self
+    }
 
-    // Write the header row
-    wtr.write_record(header)?;
+    /// Adds a single row to the CSV file.
+    pub fn add_row(mut self, row: &[&str]) -> Self {
+        if self.error.is_none() {
+            if let Err(e) = self.writer.write_record(row) {
+                self.error = Some(Box::new(e));
+            }
+        }
+        self
+    }
 
-    wtr.flush()?;
-    println!("CSV file has been created at {}", file_path);
-    Ok(())
+    /// Adds multiple rows to the CSV file.
+    pub fn add_rows(mut self, rows: &[&[&str]]) -> Self {
+        if self.error.is_none() {
+            for row in rows {
+                if let Err(e) = self.writer.write_record(*row) {
+                    self.error = Some(Box::new(e));
+                    break;
+                }
+            }
+        }
+        self
+    }
+
+}
+
+impl Drop for CsvBuilder {
+    fn drop(&mut self) {
+        if let Some(_) = &self.error {
+            // If there was an error, don't print the success message
+            return;
+        }
+
+        if let Err(_) = self.writer.flush() {
+            eprintln!("Error occurred while finalizing CSV file.");
+            return;
+        }
+
+        println!("CSV file has been successfully created at {}", self.file_path);
+    }
 }
