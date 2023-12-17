@@ -20,19 +20,19 @@ use std::error::Error as StdError;
 ///
 /// Example 1: Without Headers
 /// ```
-/// use reqwest::Method;
 /// use serde_json::json;
 /// use rgwml::api_utils::ApiCallBuilder;
 ///
 /// #[tokio::main]
 /// async fn main() {
+///     let method = "POST"; // Or "GET", "PUT", "DELETE"
 ///     let url = "http://example.com/api/submit";
 ///     let payload = json!({
 ///         "field1": "Hello",
 ///         "field2": 123
 ///     });
 ///     let response = ApiCallBuilder::call(
-///             Method::POST,
+///             method,            
 ///             url,
 ///             None, // No custom headers
 ///             Some(payload)
@@ -48,12 +48,12 @@ use std::error::Error as StdError;
 ///
 /// Example 2: With Headers
 /// ```
-/// use reqwest::Method;
 /// use serde_json::json;
 /// use rgwml::api_utils::ApiCallBuilder;
 ///
 /// #[tokio::main]
 /// async fn main() {
+///     let method = "POST"; // Or "GET", "PUT", "DELETE"
 ///     let url = "http://example.com/api/submit";
 ///     let headers = json!({
 ///         "Content-Type": "application/json",
@@ -64,7 +64,7 @@ use std::error::Error as StdError;
 ///         "field2": 123
 ///     });
 ///     let response = ApiCallBuilder::call(
-///             Method::POST,
+///             method,
 ///             url,
 ///             Some(headers), // Custom headers
 ///             Some(payload)
@@ -89,7 +89,7 @@ use std::error::Error as StdError;
 /// ```
 
 pub struct ApiCallBuilder {
-    method: Method,
+    method: String,
     url: String,
     header_option: Option<JsonValue>,
     payload: Option<JsonValue>,
@@ -98,9 +98,9 @@ pub struct ApiCallBuilder {
 }
 
 impl ApiCallBuilder {
-    pub fn call(method: Method, url: &str, header_option: Option<JsonValue>, payload: Option<JsonValue>) -> Self {
+    pub fn call(method: &str, url: &str, header_option: Option<JsonValue>, payload: Option<JsonValue>) -> Self {
         Self {
-            method,
+            method: method.to_uppercase(),
             url: url.to_string(),
             header_option,
             payload,
@@ -131,8 +131,17 @@ impl ApiCallBuilder {
         }
 
         println!("Making a new API call.");
+    let reqwest_method = match self.method.as_str() {
+        "GET" => reqwest::Method::GET,
+        "POST" => reqwest::Method::POST,
+        "PUT" => reqwest::Method::PUT,
+        "DELETE" => reqwest::Method::DELETE,
+        // ... handle other cases or default case ...
+        _ => return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Invalid HTTP method"))),
+    };
+
         let client = Client::new();
-        let mut request_builder = client.request(self.method.clone(), &self.url);
+        let mut request_builder = client.request(reqwest_method, &self.url);
 
                 // Convert JsonValue to HeaderMap
         if let Some(header_json) = self.header_option {
@@ -146,8 +155,8 @@ impl ApiCallBuilder {
             request_builder = request_builder.headers(header_map);
         }
 
-        // Handle payload
-        if self.method == Method::POST {
+        // Handle payload for POST, PUT
+        if ["POST", "PUT"].contains(&self.method.as_str()) {
             if let Some(payload_json) = self.payload {
                 request_builder = request_builder.json(&payload_json);
             }

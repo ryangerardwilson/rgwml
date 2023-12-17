@@ -129,19 +129,19 @@
 //!
 //! Example 1: Without Headers
 //! ```
-//! use reqwest::Method;
 //! use serde_json::json;
 //! use rgwml::api_utils::ApiCallBuilder;
 //!
 //! #[tokio::main]
 //! async fn main() {
+//!     let method = "POST"; // Or "GET", "PUT", "DELETE"
 //!     let url = "http://example.com/api/submit";
 //!     let payload = json!({
 //!         "field1": "Hello",
 //!         "field2": 123
 //!     });
 //!     let response = ApiCallBuilder::call(
-//!             Method::POST,
+//!             method,
 //!             url,
 //!             None, // No custom headers
 //!             Some(payload)
@@ -163,6 +163,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
+//!     let method = "POST"; // Or "GET", "PUT", "DELETE"
 //!     let url = "http://example.com/api/submit";
 //!     let headers = json!({
 //!         "Content-Type": "application/json",
@@ -173,7 +174,7 @@
 //!         "field2": 123
 //!     });
 //!     let response = ApiCallBuilder::call(
-//!             Method::POST,
+//!             method,
 //!             url,
 //!             Some(headers), // Custom headers
 //!             Some(payload)
