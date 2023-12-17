@@ -125,13 +125,13 @@
 //!
 //! ### api_utils
 //!
-//! This module features the APICallBuilder a fluent interface for building API requests with support for method chaining. It features an option for including custom headers via the `HeaderOption` enum. The `HeaderOption::Set` variant takes a `JsonValue`, allowing you to specify headers in JSON format. These headers are then converted and inserted into the request. If caching is enabled, responses are stored and reused for subsequent requests made within the specified cache duration.
+//! This module features the APICallBuilder a fluent interface to build API requests with support for method chaining. It simplifies the process by allowing you to specify both headers and payload as `serde_json::Value`. This approach is convenient when dealing with JSON data, making it easy to construct requests dynamically. If caching is enabled, responses are stored and reused for subsequent requests made within the specified cache duration.
 //!
 //! Example 1: Without Headers
 //! ```
 //! use reqwest::Method;
 //! use serde_json::json;
-//! use rgwml::api_utils::{ApiCallBuilder, HeaderOption};
+//! use rgwml::api_utils::ApiCallBuilder;
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -143,7 +143,7 @@
 //!     let response = ApiCallBuilder::call(
 //!             Method::POST,
 //!             url,
-//!             HeaderOption::None, // No custom headers
+//!             None, // No custom headers
 //!             Some(payload)
 //!         )
 //!         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
@@ -159,14 +159,14 @@
 //! ```
 //! use reqwest::Method;
 //! use serde_json::json;
-//! use rgwml::api_utils::{ApiCallBuilder, HeaderOption};
+//! use rgwml::api_utils::ApiCallBuilder;
 //!
 //! #[tokio::main]
 //! async fn main() {
 //!     let url = "http://example.com/api/submit";
 //!     let headers = json!({
 //!         "Content-Type": "application/json",
-//!         "Authorization": "Bearer token123"
+//!         "Authorization": "Bearer your_token_here"
 //!     });
 //!     let payload = json!({
 //!         "field1": "Hello",
@@ -175,7 +175,7 @@
 //!     let response = ApiCallBuilder::call(
 //!             Method::POST,
 //!             url,
-//!             HeaderOption::Set(headers), // Custom headers set
+//!             Some(headers), // Custom headers
 //!             Some(payload)
 //!         )
 //!         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
@@ -187,15 +187,13 @@
 //! }
 //! ```
 //!
-//! In the second example, the `HeaderOption::Set` variant is used to specify custom headers in JSON format. These headers are processed and applied to the request.
+//! These examples demonstrate how to use the ApiCallBuilder with and without custom headers. Since the headers and payload are specified as `serde_json::Value`, it offers flexibility in constructing various types of requests.
 //!
 //! Note: Be cautious when caching POST requests, as they typically send unique data each time. Caching is most effective when the same request is likely to yield the same response.
-//! ```
 //!
 //! ### csv_utils
 //! 
 //! This module features the CsvBuilder, a fluent interface for creating and writing to CSV files. 
-//!
 //! ```
 //! use rgwml::csv_utils::CsvBuilder;
 //!

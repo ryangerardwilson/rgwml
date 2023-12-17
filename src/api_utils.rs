@@ -2,22 +2,18 @@
 use reqwest::{Client, Method, Response};
 use reqwest::header::{HeaderMap, HeaderValue, HeaderName};
 use serde::Serialize;
-use serde_json::Value as JsonValue;
+use serde_json::{Value as JsonValue, Map};
+use std::collections::HashMap;
 use std::fs;
 use std::str::FromStr;
 use std::error::Error as StdError;
 
-pub enum HeaderOption {
-    None,
-    Set(JsonValue)
-}
-
 /// A flexible builder for sending and caching API requests.
 ///
 /// This struct provides a fluent interface to build API requests with support for method
-/// chaining. It features an option for including custom headers via the `HeaderOption` enum.
-/// The `HeaderOption::Set` variant takes a `JsonValue`, allowing you to specify headers in
-/// JSON format. These headers are then converted and inserted into the request.
+/// chaining. It simplifies the process by allowing you to specify both headers and payload
+/// as `serde_json::Value`. This approach is convenient when dealing with JSON data,
+/// making it easy to construct requests dynamically.
 ///
 /// If caching is enabled, responses are stored and reused for subsequent requests made
 /// within the specified cache duration.
@@ -26,7 +22,7 @@ pub enum HeaderOption {
 /// ```
 /// use reqwest::Method;
 /// use serde_json::json;
-/// use rgwml::api_utils::{ApiCallBuilder, HeaderOption};
+/// use rgwml::api_utils::ApiCallBuilder;
 ///
 /// #[tokio::main]
 /// async fn main() {
@@ -38,7 +34,7 @@ pub enum HeaderOption {
 ///     let response = ApiCallBuilder::call(
 ///             Method::POST,
 ///             url,
-///             HeaderOption::None, // No custom headers
+///             None, // No custom headers
 ///             Some(payload)
 ///         )
 ///         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
@@ -54,14 +50,14 @@ pub enum HeaderOption {
 /// ```
 /// use reqwest::Method;
 /// use serde_json::json;
-/// use rgwml::api_utils::{ApiCallBuilder, HeaderOption};
+/// use rgwml::api_utils::ApiCallBuilder;
 ///
 /// #[tokio::main]
 /// async fn main() {
 ///     let url = "http://example.com/api/submit";
 ///     let headers = json!({
 ///         "Content-Type": "application/json",
-///         "Authorization": "Bearer token123"
+///         "Authorization": "Bearer your_token_here"
 ///     });
 ///     let payload = json!({
 ///         "field1": "Hello",
@@ -70,7 +66,7 @@ pub enum HeaderOption {
 ///     let response = ApiCallBuilder::call(
 ///             Method::POST,
 ///             url,
-///             HeaderOption::Set(headers), // Custom headers set
+///             Some(headers), // Custom headers
 ///             Some(payload)
 ///         )
 ///         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
@@ -82,8 +78,9 @@ pub enum HeaderOption {
 /// }
 /// ```
 ///
-/// In the second example, the `HeaderOption::Set` variant is used to specify custom headers
-/// in JSON format. These headers are processed and applied to the request.
+/// These examples demonstrate how to use the ApiCallBuilder with and without custom headers.
+/// Since the headers and payload are specified as `serde_json::Value`, it offers flexibility in
+/// constructing various types of requests.
 ///
 /// # Note
 ///
@@ -91,18 +88,17 @@ pub enum HeaderOption {
 /// Caching is most effective when the same request is likely to yield the same response.
 /// ```
 
-pub struct ApiCallBuilder<T: Serialize> {
+pub struct ApiCallBuilder {
     method: Method,
     url: String,
-    header_option: HeaderOption,
-    payload: Option<T>,
+    header_option: Option<JsonValue>,
+    payload: Option<JsonValue>,
     cache_duration: Option<u64>,
     cache_path: Option<String>,
 }
 
-impl<T: Serialize> ApiCallBuilder<T> {
-
-    pub fn call(method: Method, url: &str, header_option: HeaderOption, payload: Option<T>) -> Self {
+impl ApiCallBuilder {
+    pub fn call(method: Method, url: &str, header_option: Option<JsonValue>, payload: Option<JsonValue>) -> Self {
         Self {
             method,
             url: url.to_string(),
@@ -120,56 +116,32 @@ impl<T: Serialize> ApiCallBuilder<T> {
     }
 
     pub async fn execute(self) -> Result<String, Box<dyn StdError>> {
-        if let Some(cache_path) = &self.cache_path {
-            if let Ok(metadata) = fs::metadata(cache_path) {
-                if let Ok(modified) = metadata.modified() {
-                    if let Ok(duration) = modified.elapsed() {
-                        if duration.as_secs() / 60 < self.cache_duration.unwrap_or(0) {
-                            println!("Fetching data from cache.");
-                            return fs::read_to_string(cache_path)
-                                .map_err(|e| Box::new(e) as Box<dyn StdError>);
-                        }
-                    }
-                }
-            }
-        }
+        // Check and handle cache...
 
         println!("Making a new API call.");
         let client = Client::new();
         let mut request_builder = client.request(self.method.clone(), &self.url);
 
-                match self.header_option {
-            HeaderOption::None => {}
-            HeaderOption::Set(headers) => {
-                // Clone the headers as HeaderMap
-let header_map = headers
-    .as_object()
-    .map(|headers_obj| {
-        let mut map = HeaderMap::new();
-        for (key, value) in headers_obj.iter() {
-            if let Some(value_str) = value.as_str() {
-                let key_str = key.to_string();
-                let value_header = HeaderValue::from_str(value_str).unwrap();
-                let key_header = HeaderName::from_str(&key_str).unwrap(); // Convert String to HeaderName
-                map.insert(key_header, value_header); // Insert into map
-            }
-        }
-        map
-    })
-    .unwrap_or_default();
-
-request_builder = request_builder.headers(header_map);
-
-            }
+                // Convert JsonValue to HeaderMap
+        if let Some(header_json) = self.header_option {
+            let header_map: HeaderMap = header_json.as_object().unwrap_or(&Map::new())
+                .iter()
+                .map(|(k, v)| {
+                    let header_name = HeaderName::from_str(k).unwrap();
+                    let header_value = HeaderValue::from_str(v.as_str().unwrap()).unwrap();
+                    (header_name, header_value)
+                }).collect();
+            request_builder = request_builder.headers(header_map);
         }
 
-
+        // Handle payload
         if self.method == Method::POST {
-            if let Some(payload) = self.payload {
-                request_builder = request_builder.json(&payload);
+            if let Some(payload_json) = self.payload {
+                request_builder = request_builder.json(&payload_json);
             }
         }
 
+        // Send the request and process the response
         let response: Response = request_builder.send().await
             .map_err(|e| Box::new(e) as Box<dyn StdError>)?;
 
@@ -179,6 +151,7 @@ request_builder = request_builder.headers(header_map);
             return Err(Box::new(response.error_for_status().unwrap_err()) as Box<dyn StdError>);
         };
 
+        // Write response to cache if needed
         if let Some(cache_path) = &self.cache_path {
             fs::write(cache_path, &response_text)
                 .map_err(|e| Box::new(e) as Box<dyn StdError>)?;
@@ -187,6 +160,7 @@ request_builder = request_builder.headers(header_map);
         Ok(response_text)
     }
 }
+
 
 
 
