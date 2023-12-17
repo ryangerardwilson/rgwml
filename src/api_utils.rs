@@ -1,9 +1,9 @@
 // api_utils.rs
 use reqwest::{Client, Method, Response};
 use reqwest::header::{HeaderMap, HeaderValue, HeaderName};
-use serde::Serialize;
+// use serde::Serialize;
 use serde_json::{Value as JsonValue, Map};
-use std::collections::HashMap;
+// use std::collections::HashMap;
 use std::fs;
 use std::str::FromStr;
 use std::error::Error as StdError;
