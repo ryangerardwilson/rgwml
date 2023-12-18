@@ -38,15 +38,15 @@ impl CsvBuilder {
         let writer: Box<dyn Write> = match File::create(file_path) {
             Ok(file) => Box::new(file),
             Err(e) => {
-                return CsvBuilder { 
-                    writer: Writer::from_writer(Box::new(io::sink())), 
+                return CsvBuilder {
+                    writer: Writer::from_writer(Box::new(io::sink())),
                     error: Some(Box::new(e)),
                     file_path: file_path.to_string(),
                 };
             }
         };
-        CsvBuilder { 
-            writer: Writer::from_writer(writer), 
+        CsvBuilder {
+            writer: Writer::from_writer(writer),
             error: None,
             file_path: file_path.to_string(),
         }
@@ -83,7 +83,6 @@ impl CsvBuilder {
         }
         self
     }
-
 }
 
 impl Drop for CsvBuilder {
@@ -98,6 +97,9 @@ impl Drop for CsvBuilder {
             return;
         }
 
-        println!("CSV file has been successfully created at {}", self.file_path);
+        println!(
+            "CSV file has been successfully created at {}",
+            self.file_path
+        );
     }
 }

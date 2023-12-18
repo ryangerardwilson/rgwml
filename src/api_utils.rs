@@ -1,12 +1,12 @@
 // api_utils.rs
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::{Client, Response};
-use reqwest::header::{HeaderMap, HeaderValue, HeaderName};
 // use serde::Serialize;
-use serde_json::{Value as JsonValue, Map};
+use serde_json::{Map, Value as JsonValue};
 // use std::collections::HashMap;
+use std::error::Error as StdError;
 use std::fs;
 use std::str::FromStr;
-use std::error::Error as StdError;
 
 /// A flexible builder for sending and caching API requests.
 ///
@@ -97,7 +97,12 @@ pub struct ApiCallBuilder {
 }
 
 impl ApiCallBuilder {
-    pub fn call(method: &str, url: &str, header_option: Option<JsonValue>, payload: Option<JsonValue>) -> Self {
+    pub fn call(
+        method: &str,
+        url: &str,
+        header_option: Option<JsonValue>,
+        payload: Option<JsonValue>,
+    ) -> Self {
         Self {
             method: method.to_uppercase(),
             url: url.to_string(),
@@ -130,27 +135,35 @@ impl ApiCallBuilder {
         }
 
         println!("Making a new API call.");
-    let reqwest_method = match self.method.as_str() {
-        "GET" => reqwest::Method::GET,
-        "POST" => reqwest::Method::POST,
-        "PUT" => reqwest::Method::PUT,
-        "DELETE" => reqwest::Method::DELETE,
-        // ... handle other cases or default case ...
-        _ => return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Invalid HTTP method"))),
-    };
+        let reqwest_method = match self.method.as_str() {
+            "GET" => reqwest::Method::GET,
+            "POST" => reqwest::Method::POST,
+            "PUT" => reqwest::Method::PUT,
+            "DELETE" => reqwest::Method::DELETE,
+            // ... handle other cases or default case ...
+            _ => {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Invalid HTTP method",
+                )))
+            }
+        };
 
         let client = Client::new();
         let mut request_builder = client.request(reqwest_method, &self.url);
 
-                // Convert JsonValue to HeaderMap
+        // Convert JsonValue to HeaderMap
         if let Some(header_json) = self.header_option {
-            let header_map: HeaderMap = header_json.as_object().unwrap_or(&Map::new())
+            let header_map: HeaderMap = header_json
+                .as_object()
+                .unwrap_or(&Map::new())
                 .iter()
                 .map(|(k, v)| {
                     let header_name = HeaderName::from_str(k).unwrap();
                     let header_value = HeaderValue::from_str(v.as_str().unwrap()).unwrap();
                     (header_name, header_value)
-                }).collect();
+                })
+                .collect();
             request_builder = request_builder.headers(header_map);
         }
 
@@ -162,25 +175,25 @@ impl ApiCallBuilder {
         }
 
         // Send the request and process the response
-        let response: Response = request_builder.send().await
+        let response: Response = request_builder
+            .send()
+            .await
             .map_err(|e| Box::new(e) as Box<dyn StdError>)?;
 
         let response_text = if response.status().is_success() {
-            response.text().await.map_err(|e| Box::new(e) as Box<dyn StdError>)?
+            response
+                .text()
+                .await
+                .map_err(|e| Box::new(e) as Box<dyn StdError>)?
         } else {
             return Err(Box::new(response.error_for_status().unwrap_err()) as Box<dyn StdError>);
         };
 
         // Write response to cache if needed
         if let Some(cache_path) = &self.cache_path {
-            fs::write(cache_path, &response_text)
-                .map_err(|e| Box::new(e) as Box<dyn StdError>)?;
+            fs::write(cache_path, &response_text).map_err(|e| Box::new(e) as Box<dyn StdError>)?;
         }
 
         Ok(response_text)
     }
 }
-
-
-
-

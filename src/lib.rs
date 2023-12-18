@@ -2,7 +2,7 @@
 //! # RGWML (an AI, Data Science & Machine Learning Library designed to minimize developer cognitive load)
 //!
 //! This library simplifies Data Science, Machine Learning, and Artifical Intelligence operations. It's designed to leverage the best features of RUST, in a manner that is graceful, elegant, and ticklishly fun to build upon.
-//! 
+//!
 //! ## Modules Overview
 //!
 //! ### `df_utils`
@@ -55,16 +55,16 @@
 //! - Limit the number of results.
 //! - Apply multi-level sorting based on specified criteria using `cascade_sort`.
 //! - Convert date-time columns to a standardized format.
-//! 
+//!
 //! Example
 //! ```
 //! use std::collections::HashMap;
 //! use serde_json::Value;
 //! use rgwml::df_utils::{Dataframe, Query};
-//! 
+//!
 //! // Assuming DataFrame is a type that holds a collection of data.
 //! let df = DataFrame::new(); // Replace with actual DataFrame initialization
-//! 
+//!
 //! let result = Query::new(df)
 //!     .select(&["column1", "column2"]) // Selecting specific columns
 //!     .where_("column1", "==", 42) // Adding a condition based on column value
@@ -73,9 +73,9 @@
 //!     .cascade_sort(vec![("column1", "DESC"), ("column2", "ASC")]) // Applying multi-level sorting
 //!     .convert_specified_columns_to_lexicographically_comparable_timestamps(&["date_column"])
 //!     .execute(); // Executing the query
-//! 
+//!
 //! // `result` now contains a DataFrame with the specified columns, conditions, sorting, and limits applied.
-//! ``` 
+//! ```
 //!
 //! Note: This example assumes the existence of a `DataFrame` type and relevant methods.
 //! Replace placeholder code with actual implementations as per your project's context.
@@ -103,11 +103,11 @@
 //!
 //! // `grouped_dfs` will now contain two grouped DataFrames, one for each category (`Fruit` and `Vegetable`).
 //! ```
-//! 
+//!
 //! ### ai_utils
 //!
 //! Dive into the world of AI with `fuzzai`, an asynchronous function that processes neural associations in parallel. Imagine analyzing the neural network's decision-making process in a world where AI has developed a fondness for classic video games!
-//! 
+//!
 //! ```rust
 //! use rgwml::ai_utils::{NeuralAssociation2D, fuzzai};
 //!
@@ -206,8 +206,8 @@
 //! Note: Be cautious when caching POST requests, as they typically send unique data each time. Caching is most effective when the same request is likely to yield the same response.
 //!
 //! ### csv_utils
-//! 
-//! This module features the CsvBuilder, a fluent interface for creating and writing to CSV files. 
+//!
+//! This module features the CsvBuilder, a fluent interface for creating and writing to CSV files.
 //! ```
 //! use rgwml::csv_utils::CsvBuilder;
 //!
@@ -223,9 +223,7 @@
 //!
 //! This project is licensed under the MIT License - see the LICENSE file for details.
 
-pub mod df_utils;
 pub mod ai_utils;
 pub mod api_utils;
 pub mod csv_utils;
-
-
+pub mod df_utils;

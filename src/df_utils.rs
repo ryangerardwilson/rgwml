@@ -1,8 +1,8 @@
 // df_utils.rs
+use chrono::{DateTime, NaiveDateTime};
 use serde::ser::StdError;
 use serde_json::{json, Map, Number, Value};
 use std::collections::{HashMap, HashSet};
-use chrono::{DateTime, NaiveDateTime};
 
 pub type DataFrame = Vec<HashMap<String, Value>>;
 
@@ -130,11 +130,11 @@ struct SortOrder {
 }
 
 /// `Query` struct provides a fluent interface for querying and manipulating data within a `DataFrame`.
-/// 
+///
 /// It supports operations like selecting specific columns, applying conditions to rows, limiting the
 /// number of results, filtering rows based on their indices, and performing multi-level sorting using
 /// the `cascade_sort` method.
-/// 
+///
 /// # Fields
 /// - `dataframe`: The DataFrame on which the queries are executed.
 /// - `conditions`: A vector of boxed closures that define conditions for filtering rows based on column values.
@@ -144,7 +144,7 @@ struct SortOrder {
 /// - `order_by_sequence`: A vector of sorting criteria used for multi-level sorting through `cascade_sort`.
 ///     
 /// Example demonstrating the use of the `Query` struct.
-/// 
+///
 /// In this example, we create a `Query` instance and utilize its various features:
 /// - Select specific columns.
 /// - Apply conditions on column values.
@@ -170,13 +170,13 @@ struct SortOrder {
 ///     .cascade_sort(vec![("column1", "DESC"), ("column2", "ASC")]) // Applying multi-level sorting
 ///     .convert_specified_columns_to_lexicographically_comparable_timestamps(&["date_column"])
 ///     .execute(); // Executing the query
-/// 
+///
 /// // `result` now contains a DataFrame with the specified columns, conditions, sorting, and limits applied.
 /// ```
-/// 
+///
 /// Note: This example assumes the existence of a `DataFrame` type and relevant methods.
 /// Replace placeholder code with actual implementations as per your project's context.
-/// 
+///
 pub struct Query {
     dataframe: DataFrame,
     conditions: Vec<Box<dyn Fn(&HashMap<String, Value>) -> bool>>,
@@ -187,7 +187,6 @@ pub struct Query {
 }
 
 impl Query {
-
     #[doc(hidden)]
     pub fn new(dataframe: DataFrame) -> Self {
         Query {
@@ -266,31 +265,31 @@ impl Query {
     /// In the example above, `where_` is used with a direct integer and string,
     /// which are automatically converted into the appropriate `Value` type.
     pub fn where_<T: Into<Value>>(mut self, column_name: &str, operation: &str, value: T) -> Self {
-    let column_name = column_name.to_string();
-    let operation = operation.to_string();
-    let value = value.into(); // Convert the generic value into a `Value` type
+        let column_name = column_name.to_string();
+        let operation = operation.to_string();
+        let value = value.into(); // Convert the generic value into a `Value` type
 
-    let condition: Box<dyn Fn(&HashMap<String, Value>) -> bool> = Box::new(move |row| {
-        if let Some(row_value) = row.get(&column_name) {
-            match (row_value, &value) {
-                (Value::Number(n1), Value::Number(n2)) => {
-                    Query::compare_numbers(n1, n2, &operation)
-                }
-                (Value::String(s1), Value::String(s2)) => match operation.as_str() {
-                    "==" => s1 == s2,
+        let condition: Box<dyn Fn(&HashMap<String, Value>) -> bool> = Box::new(move |row| {
+            if let Some(row_value) = row.get(&column_name) {
+                match (row_value, &value) {
+                    (Value::Number(n1), Value::Number(n2)) => {
+                        Query::compare_numbers(n1, n2, &operation)
+                    }
+                    (Value::String(s1), Value::String(s2)) => match operation.as_str() {
+                        "==" => s1 == s2,
+                        _ => false,
+                    },
+                    // Add more comparisons as needed
                     _ => false,
-                },
-                // Add more comparisons as needed
-                _ => false,
+                }
+            } else {
+                false
             }
-        } else {
-            false
-        }
-    });
+        });
 
-    self.conditions.push(condition);
-    self
-}
+        self.conditions.push(condition);
+        self
+    }
 
     /// Sets a limit for the number of records to return in the query. This method is useful
     /// for controlling the size of the result set, particularly in cases where only a sample
@@ -323,9 +322,8 @@ impl Query {
         self
     }
 
-
-    /// Adds a condition to filter rows based on their index in the DataFrame. This method is 
-    /// particularly useful for slicing the DataFrame based on row indices, allowing for 
+    /// Adds a condition to filter rows based on their index in the DataFrame. This method is
+    /// particularly useful for slicing the DataFrame based on row indices, allowing for
     /// operations on specific segments of the data.
     ///
     /// # Arguments
@@ -355,7 +353,7 @@ impl Query {
     ///    safety by ensuring that each thread works with its own copy of the data, thereby avoiding
     ///    potential issues with data access conflicts.
     ///
-    /// However, cloning does have a performance and memory usage cost, as it creates a complete 
+    /// However, cloning does have a performance and memory usage cost, as it creates a complete
     /// copy of the DataFrame. In scenarios where these factors are critical, and you are certain
     /// that the original DataFrame will not be needed in its unmodified form, you might choose to
     /// not clone it to optimize performance.
@@ -364,7 +362,6 @@ impl Query {
         self.index_conditions.push(condition);
         self
     }
-
 
     /// Adds multi-level sorting conditions to the DataFrame query. This method allows sorting
     /// based on multiple columns, each with its own sorting order (ascending or descending).
@@ -402,74 +399,74 @@ impl Query {
     /// the priority and sequence of the sorting. The sorting is stable, meaning that the order of
     /// equal elements is preserved relative to their original order in the DataFrame.
     pub fn cascade_sort(mut self, orders: Vec<(&str, &str)>) -> Self {
-        self.order_by_sequence = orders.into_iter().map(|(column_name, order)| {
-            SortOrder {
+        self.order_by_sequence = orders
+            .into_iter()
+            .map(|(column_name, order)| SortOrder {
                 column_name: column_name.to_string(),
                 is_ascending: order.eq_ignore_ascii_case("ASC"),
-            }
-        }).collect();
+            })
+            .collect();
         self
     }
 
-
     #[doc(hidden)]
-pub fn execute(mut self) -> DataFrame {
-    let mut result: DataFrame = Vec::new();
-    let mut index = 0;
+    pub fn execute(self) -> DataFrame {
+        let mut result: DataFrame = Vec::new();
+        let mut index = 0;
 
-    for row in &self.dataframe {
-        // Check if the row satisfies all the regular and index conditions
-        if self.conditions.iter().all(|cond| cond(&row)) &&
-           self.index_conditions.iter().all(|cond| cond(index)) {
-            result.push(row.clone());
-        }
-        index += 1;
-    }
-
-    // Apply nested sorting
-    if !self.order_by_sequence.is_empty() {
-        result.sort_by(|a, b| {
-            for sort_order in &self.order_by_sequence {
-                let value_a = a.get(&sort_order.column_name).unwrap_or(&Value::Null);
-                let value_b = b.get(&sort_order.column_name).unwrap_or(&Value::Null);
-
-                let comparison = compare_values(value_a, value_b);
-                let ordered_comparison = if sort_order.is_ascending {
-                    comparison
-                } else {
-                    comparison.reverse()
-                };
-
-                if ordered_comparison != std::cmp::Ordering::Equal {
-                    return ordered_comparison;
-                }
+        for row in &self.dataframe {
+            // Check if the row satisfies all the regular and index conditions
+            if self.conditions.iter().all(|cond| cond(&row))
+                && self.index_conditions.iter().all(|cond| cond(index))
+            {
+                result.push(row.clone());
             }
-            std::cmp::Ordering::Equal
-        });
-    }
+            index += 1;
+        }
 
-    if let Some(limit) = self.limit {
-        result.truncate(limit);
-    }
+        // Apply nested sorting
+        if !self.order_by_sequence.is_empty() {
+            result.sort_by(|a, b| {
+                for sort_order in &self.order_by_sequence {
+                    let value_a = a.get(&sort_order.column_name).unwrap_or(&Value::Null);
+                    let value_b = b.get(&sort_order.column_name).unwrap_or(&Value::Null);
 
-    if let Some(selected_columns) = self.selected_columns {
-        result = result
-            .into_iter()
-            .map(|mut row| {
-                let mut filtered_row = HashMap::new();
-                for column in &selected_columns {
-                    if let Some(value) = row.remove(column) {
-                        filtered_row.insert(column.clone(), value);
+                    let comparison = compare_values(value_a, value_b);
+                    let ordered_comparison = if sort_order.is_ascending {
+                        comparison
+                    } else {
+                        comparison.reverse()
+                    };
+
+                    if ordered_comparison != std::cmp::Ordering::Equal {
+                        return ordered_comparison;
                     }
                 }
-                filtered_row
-            })
-            .collect();
+                std::cmp::Ordering::Equal
+            });
+        }
+
+        if let Some(limit) = self.limit {
+            result.truncate(limit);
+        }
+
+        if let Some(selected_columns) = self.selected_columns {
+            result = result
+                .into_iter()
+                .map(|mut row| {
+                    let mut filtered_row = HashMap::new();
+                    for column in &selected_columns {
+                        if let Some(value) = row.remove(column) {
+                            filtered_row.insert(column.clone(), value);
+                        }
+                    }
+                    filtered_row
+                })
+                .collect();
+        }
+
+        result
     }
-
-    result
-}
-
 
     /// Tries to convert specified date-time columns in various formats to a unified,
     /// lexicographically comparable "YYYY-MM-DD HH:MM:SS" format. This standardization
@@ -507,25 +504,40 @@ pub fn execute(mut self) -> DataFrame {
     /// convert the date-time values in "column_1" and "column_2" into a standardized format.
     /// This standardization facilitates accurate comparisons and sorting based on date-time
     /// values, ensuring consistency across the dataset.
-    pub fn convert_specified_columns_to_lexicographically_comparable_timestamps(mut self, column_names: &[&str]) -> Self {
+    pub fn convert_specified_columns_to_lexicographically_comparable_timestamps(
+        mut self,
+        column_names: &[&str],
+    ) -> Self {
         let formats = vec![
-            "%Y-%m-%d %H:%M:%S", "%+",
-            "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d", "%m/%d/%Y %I:%M:%S %p"
+            "%Y-%m-%d %H:%M:%S",
+            "%+",
+            "%Y-%m-%dT%H:%M:%S%z",
+            "%Y-%m-%d",
+            "%m/%d/%Y %I:%M:%S %p",
         ];
 
         for row in &mut self.dataframe {
             for &column_name in column_names {
                 if let Some(Value::String(time_str)) = row.get(column_name) {
-                    let parsed_date = formats.iter()
+                    let parsed_date = formats
+                        .iter()
                         .find_map(|&format| NaiveDateTime::parse_from_str(time_str, format).ok())
-                        .or_else(|| DateTime::parse_from_rfc2822(time_str).map(|dt| dt.naive_local()).ok())
-                        .or_else(|| DateTime::parse_from_rfc3339(time_str).map(|dt| dt.naive_local()).ok());
+                        .or_else(|| {
+                            DateTime::parse_from_rfc2822(time_str)
+                                .map(|dt| dt.naive_local())
+                                .ok()
+                        })
+                        .or_else(|| {
+                            DateTime::parse_from_rfc3339(time_str)
+                                .map(|dt| dt.naive_local())
+                                .ok()
+                        });
 
                     match parsed_date {
                         Some(date_time) => {
                             let formatted_date = date_time.format("%Y-%m-%d %H:%M:%S").to_string();
                             row.insert(column_name.to_string(), Value::String(formatted_date));
-                        },
+                        }
                         None => {
                             println!("Error parsing date in column '{}': Unable to match formats. Original string: '{}'", column_name, time_str);
                         }
@@ -535,7 +547,6 @@ pub fn execute(mut self) -> DataFrame {
         }
         self
     }
-
 }
 
 /// A utility for grouping rows in a DataFrame based on a specified key.
@@ -598,13 +609,11 @@ impl<'a> Grouper<'a> {
 fn compare_values(a: &Value, b: &Value) -> std::cmp::Ordering {
     match (a, b) {
         // Compare as numbers
-        (Value::Number(num_a), Value::Number(num_b)) => {
-            match (num_a.as_f64(), num_b.as_f64()) {
-                (Some(f1), Some(f2)) => f1.partial_cmp(&f2).unwrap_or(std::cmp::Ordering::Equal),
-                (None, Some(_)) => std::cmp::Ordering::Less,
-                (Some(_), None) => std::cmp::Ordering::Greater,
-                (None, None) => std::cmp::Ordering::Equal,
-            }
+        (Value::Number(num_a), Value::Number(num_b)) => match (num_a.as_f64(), num_b.as_f64()) {
+            (Some(f1), Some(f2)) => f1.partial_cmp(&f2).unwrap_or(std::cmp::Ordering::Equal),
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
         },
 
         // Compare as strings
@@ -616,4 +625,3 @@ fn compare_values(a: &Value, b: &Value) -> std::cmp::Ordering {
         _ => std::cmp::Ordering::Equal,
     }
 }
-

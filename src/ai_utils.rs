@@ -215,7 +215,6 @@ pub async fn fuzzai<'a>(
                     }));
                 }
             }
-
         }
 
         let results = join_all(all_futures).await;
