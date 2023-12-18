@@ -28,69 +28,77 @@
 //! ## Examples
 //!
 //! ### df_utils
-//! 
-//! Use DataFrame utilities to analyze a list of fictional planets and their characteristics. Perfect for a galactic explorer or a daydreaming astronomer.
-//! 
-//! ```
-//! use rgwml::df_utils::{convert_json_string_to_dataframe, Query};
-//! use serde_json::Value;
 //!
-//! fn main() {
-//!     let json_data = r#"[{"name": "Tatooine", "population": 200000}, {"name": "Vulcan", "population": 6000000}]"#;
-//!     let df = convert_json_string_to_dataframe(json_data).expect("Parsing failed. Are these planets real?");
-//!     let habitable_planets = Query::new(df)
-//!         .where_("population", ">", Value::Number(1000000.into()))
-//!         .execute();
-//!     println!("Habitable planets for humans: {:?}", habitable_planets);
-//! }
-//! ```
+//! #### Query
 //!
-//! Imagine converting data about mythical creatures into a JSON format. Here's how you can do it:
+//! `Query` struct provides a fluent interface for querying and manipulating data within a `DataFrame`.
+//!
+//! It supports operations like selecting specific columns, applying conditions to rows, limiting the
+//! number of results, and filtering rows based on their indices.
+//!
+//! # Fields
+//! - `dataframe`: The DataFrame on which the queries are executed.
+//! - `conditions`: A vector of boxed closures that define conditions for filtering rows based on column values.
+//! - `index_conditions`: A vector of boxed closures that define conditions for filtering rows based on row indices.
+//! - `limit`: An optional limit on the number of rows to return.
+//! - `selected_columns`: An optional vector of columns to select in the final result.
+//!
+//! Example demonstrating the use of the `Query` struct.
+//!
+//! In this example, we create a `Query` instance and utilize its various features:
+//! - Select specific columns.
+//! - Apply conditions on column values.
+//! - Filter based on row indices.
+//! - Limit the number of results.
+//! - Convert date-time columns to a standardized format.
+//! 
+//! # Example
 //! ```
-//! use rgwml::df_utils::{data_frame_to_value_array};
-//! use serde_json::Value;
 //! use std::collections::HashMap;
-//!
-//! fn main() {
-//!     let mythical_creatures = vec![
-//!         HashMap::from([
-//!             ("name".to_string(), Value::String("Dragon".to_string())),
-//!             ("element".to_string(), Value::String("Fire".to_string())),
-//!         ]),
-//!         // ... add more creatures ...
-//!     ];
-//!
-//!     let value_array = data_frame_to_value_array(mythical_creatures);
-//!     println!("Mythical Creatures in JSON format: {:?}", value_array);
-//! }
-//! ```
-//! Here we extract unique types of magical artifacts from a DataFrame:
-//! ```
-//! use rgwml::df_utils::{convert_json_string_to_dataframe, get_unique_values};
-//!
-//! fn main() {
-//!     let json_artifacts = r#"[{"type": "Amulet", "power": 50}, {"type": "Ring", "power": 30}, {"type": "Amulet", "power": 45}]"#;
-//!     let artifacts_df = convert_json_string_to_dataframe(json_artifacts).unwrap();
-//!     let unique_artifacts_df = get_unique_values(&artifacts_df, "type");
-//!     println!("Unique Artifacts: {:?}", unique_artifacts_df);
-//! }
-//! ```
-//! Filtering enchanted forests by their magic level and limiting the result:
-//! ```
-//! use rgwml::df_utils::{convert_json_string_to_dataframe, Query};
 //! use serde_json::Value;
+//! use rgwml::df_utils::{Dataframe, Query};
+//! 
+//! // Assuming DataFrame is a type that holds a collection of data.
+//! let df = DataFrame::new(); // Replace with actual DataFrame initialization
+//! 
+//! let result = Query::new(df)
+//!     .select(&["column1", "column2"]) // Selecting specific columns
+//!     .where_("column1", "==", 42) // Adding a condition based on column value
+//!     .where_index_range(0, 10) // Filtering rows based on their index
+//!     .limit(5) // Limiting the results to 5 records
+//!     .convert_specified_columns_to_lexicographically_comparable_timestamps(&["date_column"])
+//!     .execute(); // Executing the query
+//! 
+//! // `result` now contains a DataFrame with the specified columns, conditions, and limits applied.
+//! ``` 
 //!
-//! fn main() {
-//!     let json_forests = r#"[{"name": "Emerald Woods", "magic_level": 80}, {"name": "Silvermist Forest", "magic_level": 95}, {"name": "Darkshade Woods", "magic_level": 40}]"#;
-//!     let forests_df = convert_json_string_to_dataframe(json_forests).unwrap();
-//!     
-//!     let high_magic_forests = Query::new(forests_df)
-//!         .where_("magic_level", ">", Value::Number(50.into()))
-//!         .limit(3)
-//!         .execute();
-//!     println!("High Magic Level Forests: {:?}", high_magic_forests);
-//! }
+//! Note: This example assumes the existence of a `DataFrame` type and relevant methods.
+//! Replace placeholder code with actual implementations as per your project's context.
+//!
+//!  #### Grouper
+//!
+//! A utility for grouping rows in a DataFrame based on a specified key.
+//!
+//! `Grouper` provides a way to categorize and segment data within a DataFrame,
+//! where the DataFrame is a collection of rows, and each row is a `HashMap<String, Value>`.
+//! It simplifies the process of aggregating, analyzing, or further manipulating
+//! data based on grouped criteria.
+//!
+//! Example
+//!
 //! ```
+//! use std::collections::HashMap;
+//! use rgwml::df_utils::{Grouper, DataFrame, convert_json_string_to_dataframe};
+//!
+//! let json_data = r#"[{"category": "Fruit", "item": "Apple"}, {"category": "Fruit", "item": "Banana"}, {"category": "Vegetable", "item": "Carrot"}]"#;
+//! let df = convert_json_string_to_dataframe(json_data).unwrap();
+//!
+//! let grouper = Grouper::new(&df);
+//! let grouped_dfs = grouper.group_by("category");
+//!
+//! // `grouped_dfs` will now contain two grouped DataFrames, one for each category (`Fruit` and `Vegetable`).
+//! ```
+//! 
 //! ### ai_utils
 //!
 //! Dive into the world of AI with `fuzzai`, an asynchronous function that processes neural associations in parallel. Imagine analyzing the neural network's decision-making process in a world where AI has developed a fondness for classic video games!

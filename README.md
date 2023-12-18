@@ -6,7 +6,7 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 
 ### `df_utils`
 - **Purpose**: Replicate Python Pandas library functionality in Rust.
-- **Features**: Data manipulation and transformation, filtering, sorting, and aggregating datasets.
+- **Features**: The Query and Grouper structs ease data manipulation, transformation, filtering, sorting, and aggregation.
 
 ### `ai_utils`
 - **Purpose**: Leverage Rust's concurrency for AI/Graph Theory based analysis.

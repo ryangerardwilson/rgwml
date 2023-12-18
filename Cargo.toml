@@ -1,6 +1,6 @@
 [package]
 name = "rgwml"
-version = "0.1.826"
+version = "0.1.827"
 edition = "2021"
 author = "Ryan Gerard Wilson"
 description = "A crate for reducing cognitive overload while using rust for ml, ai, and data science operations"
@@ -17,4 +17,5 @@ serde_json = "1.0"
 futures-util = "0.3.21" 
 fuzzywuzzy = "0.0.2"
 futures = "0.3"
+chrono = "0.4.31"
 
