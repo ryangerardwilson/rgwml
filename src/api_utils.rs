@@ -86,7 +86,6 @@ use std::error::Error as StdError;
 ///
 /// Be cautious when caching POST requests, as they typically send unique data each time.
 /// Caching is most effective when the same request is likely to yield the same response.
-/// ```
 
 pub struct ApiCallBuilder {
     method: String,
