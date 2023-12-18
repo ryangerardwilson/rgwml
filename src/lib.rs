@@ -34,7 +34,8 @@
 //! `Query` struct provides a fluent interface for querying and manipulating data within a `DataFrame`.
 //!
 //! It supports operations like selecting specific columns, applying conditions to rows, limiting the
-//! number of results, and filtering rows based on their indices.
+//! number of results, filtering rows based on their indices, and performing multi-level sorting using
+//! the `cascade_sort` method.
 //!
 //! Fields
 //!
@@ -43,6 +44,7 @@
 //! - `index_conditions`: A vector of boxed closures that define conditions for filtering rows based on row indices.
 //! - `limit`: An optional limit on the number of rows to return.
 //! - `selected_columns`: An optional vector of columns to select in the final result.
+//! - `order_by_sequence`: A vector of sorting criteria used for multi-level sorting through `cascade_sort`.
 //!
 //! Example demonstrating the use of the `Query` struct.
 //!
@@ -51,6 +53,7 @@
 //! - Apply conditions on column values.
 //! - Filter based on row indices.
 //! - Limit the number of results.
+//! - Apply multi-level sorting based on specified criteria using `cascade_sort`.
 //! - Convert date-time columns to a standardized format.
 //! 
 //! Example
@@ -67,10 +70,11 @@
 //!     .where_("column1", "==", 42) // Adding a condition based on column value
 //!     .where_index_range(0, 10) // Filtering rows based on their index
 //!     .limit(5) // Limiting the results to 5 records
+//!     .cascade_sort(vec![("column1", "DESC"), ("column2", "ASC")]) // Applying multi-level sorting
 //!     .convert_specified_columns_to_lexicographically_comparable_timestamps(&["date_column"])
 //!     .execute(); // Executing the query
 //! 
-//! // `result` now contains a DataFrame with the specified columns, conditions, and limits applied.
+//! // `result` now contains a DataFrame with the specified columns, conditions, sorting, and limits applied.
 //! ``` 
 //!
 //! Note: This example assumes the existence of a `DataFrame` type and relevant methods.

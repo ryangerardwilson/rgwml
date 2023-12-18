@@ -123,56 +123,67 @@ pub fn get_unique_values_dataframe(df: &DataFrame, column_name: &str) -> DataFra
     unique_values_df
 }
 
+#[doc(hidden)]
+struct SortOrder {
+    column_name: String,
+    is_ascending: bool,
+}
+
 /// `Query` struct provides a fluent interface for querying and manipulating data within a `DataFrame`.
-///
+/// 
 /// It supports operations like selecting specific columns, applying conditions to rows, limiting the
-/// number of results, and filtering rows based on their indices.
-///
+/// number of results, filtering rows based on their indices, and performing multi-level sorting using
+/// the `cascade_sort` method.
+/// 
 /// # Fields
 /// - `dataframe`: The DataFrame on which the queries are executed.
 /// - `conditions`: A vector of boxed closures that define conditions for filtering rows based on column values.
 /// - `index_conditions`: A vector of boxed closures that define conditions for filtering rows based on row indices.
 /// - `limit`: An optional limit on the number of rows to return.
 /// - `selected_columns`: An optional vector of columns to select in the final result.
-///
+/// - `order_by_sequence`: A vector of sorting criteria used for multi-level sorting through `cascade_sort`.
+///     
 /// Example demonstrating the use of the `Query` struct.
-///
+/// 
 /// In this example, we create a `Query` instance and utilize its various features:
 /// - Select specific columns.
 /// - Apply conditions on column values.
 /// - Filter based on row indices.
 /// - Limit the number of results.
+/// - Apply multi-level sorting based on specified criteria using `cascade_sort`.
 /// - Convert date-time columns to a standardized format.
-///
-/// # Example
+///             
+/// # Example   
 /// ```
 /// use std::collections::HashMap;
 /// use serde_json::Value;
 /// use rgwml::df_utils::{Dataframe, Query};
-/// 
+///         
 /// // Assuming DataFrame is a type that holds a collection of data.
 /// let df = DataFrame::new(); // Replace with actual DataFrame initialization
-///
+///     
 /// let result = Query::new(df)
 ///     .select(&["column1", "column2"]) // Selecting specific columns
 ///     .where_("column1", "==", 42) // Adding a condition based on column value
 ///     .where_index_range(0, 10) // Filtering rows based on their index
 ///     .limit(5) // Limiting the results to 5 records
+///     .cascade_sort(vec![("column1", "DESC"), ("column2", "ASC")]) // Applying multi-level sorting
 ///     .convert_specified_columns_to_lexicographically_comparable_timestamps(&["date_column"])
 ///     .execute(); // Executing the query
 /// 
-/// // `result` now contains a DataFrame with the specified columns, conditions, and limits applied.
+/// // `result` now contains a DataFrame with the specified columns, conditions, sorting, and limits applied.
 /// ```
-///
+/// 
 /// Note: This example assumes the existence of a `DataFrame` type and relevant methods.
 /// Replace placeholder code with actual implementations as per your project's context.
-///
+/// 
 pub struct Query {
     dataframe: DataFrame,
     conditions: Vec<Box<dyn Fn(&HashMap<String, Value>) -> bool>>,
     index_conditions: Vec<Box<dyn Fn(usize) -> bool>>,
     limit: Option<usize>,
     selected_columns: Option<Vec<String>>,
+    order_by_sequence: Vec<SortOrder>,
 }
 
 impl Query {
@@ -185,6 +196,7 @@ impl Query {
             index_conditions: vec![],
             limit: None,
             selected_columns: None,
+            order_by_sequence: vec![],
         }
     }
 
@@ -210,9 +222,6 @@ impl Query {
     /// In this example, `select` is used to specify that only 'column1', 'column2', and 'column3'
     /// should be included in the query result. This is followed by a `where_` condition to filter
     /// the data and finally `execute` to run the query.
-
-
-
     pub fn select(mut self, columns: &[&str]) -> Self {
         self.selected_columns = Some(columns.iter().map(|&col| col.to_string()).collect());
         self
@@ -256,7 +265,6 @@ impl Query {
     ///
     /// In the example above, `where_` is used with a direct integer and string,
     /// which are automatically converted into the appropriate `Value` type.
-
     pub fn where_<T: Into<Value>>(mut self, column_name: &str, operation: &str, value: T) -> Self {
     let column_name = column_name.to_string();
     let operation = operation.to_string();
@@ -310,7 +318,6 @@ impl Query {
     /// This is particularly useful for obtaining a small, manageable subset of the data for analysis,
     /// especially when working with large datasets. The limit is applied after the `where_` condition
     /// filters the records based on the specified criteria.
-
     pub fn limit(mut self, limit: usize) -> Self {
         self.limit = Some(limit);
         self
@@ -358,43 +365,111 @@ impl Query {
         self
     }
 
-    #[doc(hidden)]
-   
 
-    pub fn execute(self) -> DataFrame {
-        let mut result: DataFrame = Vec::new();
-        let mut index = 0;
-
-        for row in self.dataframe {
-            // Check if the row satisfies all the regular and index conditions
-            if self.conditions.iter().all(|cond| cond(&row)) && 
-               self.index_conditions.iter().all(|cond| cond(index)) {
-                result.push(row.clone());
+    /// Adds multi-level sorting conditions to the DataFrame query. This method allows sorting
+    /// based on multiple columns, each with its own sorting order (ascending or descending).
+    /// The sorting is applied in a cascading manner, meaning that the DataFrame is first sorted
+    /// by the first criterion in the list, then within each group formed by the first criterion,
+    /// it is sorted by the second criterion, and so on.
+    ///
+    /// # Arguments
+    /// - `orders`: Vec<(&str, &str)> - A vector of tuples where each tuple contains a column name
+    ///   and a sorting order ("ASC" for ascending, "DESC" for descending). The sorting is applied
+    ///   in the order of the tuples in the vector.
+    ///
+    /// # Returns
+    /// - `Self` - The Query instance with the new cascade sorting conditions added.
+    ///
+    /// # Example
+    /// ```
+    /// // Assume 'df1' is a pre-existing DataFrame instance
+    /// let sorted_df = Query::new(df1)
+    ///     .cascade_sort(vec![("column1", "DESC"), ("column2", "ASC")])
+    ///     .execute();
+    /// ```
+    ///
+    /// In this example, `df1` is sorted in a multi-level manner. First, it is sorted by `column1`
+    /// in descending order. Then, within each group of identical values in `column1`, it is sorted
+    /// by `column2` in ascending order. This method is useful for complex data sorting scenarios
+    /// where sorting based on a single column is insufficient.
+    ///
+    /// The cascade sorting functionality is particularly useful in scenarios where you need to
+    /// organize data hierarchically. For example, in a sales dataset, you might first sort by
+    /// sales region in ascending order and then within each region, sort by sales amount in
+    /// descending order to quickly identify the top-performing sales within each region.
+    ///
+    /// Note that the order of the tuples in the `orders` vector is significant as it dictates
+    /// the priority and sequence of the sorting. The sorting is stable, meaning that the order of
+    /// equal elements is preserved relative to their original order in the DataFrame.
+    pub fn cascade_sort(mut self, orders: Vec<(&str, &str)>) -> Self {
+        self.order_by_sequence = orders.into_iter().map(|(column_name, order)| {
+            SortOrder {
+                column_name: column_name.to_string(),
+                is_ascending: order.eq_ignore_ascii_case("ASC"),
             }
-            index += 1;
-        }
-
-        if let Some(limit) = self.limit {
-            result.truncate(limit);
-        }
-
-        if let Some(selected_columns) = self.selected_columns {
-            result = result
-                .into_iter()
-                .map(|mut row| {
-                    let mut filtered_row = HashMap::new();
-                    for column in &selected_columns {
-                        if let Some(value) = row.remove(column) {
-                            filtered_row.insert(column.clone(), value);
-                        }
-                    }
-                    filtered_row
-                })
-                .collect();
-        }
-
-        result
+        }).collect();
+        self
     }
+
+
+    #[doc(hidden)]
+pub fn execute(mut self) -> DataFrame {
+    let mut result: DataFrame = Vec::new();
+    let mut index = 0;
+
+    for row in &self.dataframe {
+        // Check if the row satisfies all the regular and index conditions
+        if self.conditions.iter().all(|cond| cond(&row)) &&
+           self.index_conditions.iter().all(|cond| cond(index)) {
+            result.push(row.clone());
+        }
+        index += 1;
+    }
+
+    // Apply nested sorting
+    if !self.order_by_sequence.is_empty() {
+        result.sort_by(|a, b| {
+            for sort_order in &self.order_by_sequence {
+                let value_a = a.get(&sort_order.column_name).unwrap_or(&Value::Null);
+                let value_b = b.get(&sort_order.column_name).unwrap_or(&Value::Null);
+
+                let comparison = compare_values(value_a, value_b);
+                let ordered_comparison = if sort_order.is_ascending {
+                    comparison
+                } else {
+                    comparison.reverse()
+                };
+
+                if ordered_comparison != std::cmp::Ordering::Equal {
+                    return ordered_comparison;
+                }
+            }
+            std::cmp::Ordering::Equal
+        });
+    }
+
+    if let Some(limit) = self.limit {
+        result.truncate(limit);
+    }
+
+    if let Some(selected_columns) = self.selected_columns {
+        result = result
+            .into_iter()
+            .map(|mut row| {
+                let mut filtered_row = HashMap::new();
+                for column in &selected_columns {
+                    if let Some(value) = row.remove(column) {
+                        filtered_row.insert(column.clone(), value);
+                    }
+                }
+                filtered_row
+            })
+            .collect();
+    }
+
+    result
+}
+
 
     /// Tries to convert specified date-time columns in various formats to a unified,
     /// lexicographically comparable "YYYY-MM-DD HH:MM:SS" format. This standardization
@@ -518,3 +593,27 @@ impl<'a> Grouper<'a> {
         grouped_data
     }
 }
+
+#[doc(hidden)]
+fn compare_values(a: &Value, b: &Value) -> std::cmp::Ordering {
+    match (a, b) {
+        // Compare as numbers
+        (Value::Number(num_a), Value::Number(num_b)) => {
+            match (num_a.as_f64(), num_b.as_f64()) {
+                (Some(f1), Some(f2)) => f1.partial_cmp(&f2).unwrap_or(std::cmp::Ordering::Equal),
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+        },
+
+        // Compare as strings
+        (Value::String(str_a), Value::String(str_b)) => str_a.cmp(str_b),
+
+        // Additional comparisons (e.g., arrays, objects) based on your data
+
+        // Fallback if types are different or unhandled
+        _ => std::cmp::Ordering::Equal,
+    }
+}
+
