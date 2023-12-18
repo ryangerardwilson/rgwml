@@ -36,7 +36,8 @@
 //! It supports operations like selecting specific columns, applying conditions to rows, limiting the
 //! number of results, and filtering rows based on their indices.
 //!
-//! # Fields
+//! Fields
+//!
 //! - `dataframe`: The DataFrame on which the queries are executed.
 //! - `conditions`: A vector of boxed closures that define conditions for filtering rows based on column values.
 //! - `index_conditions`: A vector of boxed closures that define conditions for filtering rows based on row indices.
@@ -52,7 +53,7 @@
 //! - Limit the number of results.
 //! - Convert date-time columns to a standardized format.
 //! 
-//! # Example
+//! Example
 //! ```
 //! use std::collections::HashMap;
 //! use serde_json::Value;
@@ -75,7 +76,7 @@
 //! Note: This example assumes the existence of a `DataFrame` type and relevant methods.
 //! Replace placeholder code with actual implementations as per your project's context.
 //!
-//!  #### Grouper
+//! #### Grouper
 //!
 //! A utility for grouping rows in a DataFrame based on a specified key.
 //!
