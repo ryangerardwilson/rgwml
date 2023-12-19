@@ -104,6 +104,54 @@
 //! // `grouped_dfs` will now contain two grouped DataFrames, one for each category (`Fruit` and `Vegetable`).
 //! ```
 //!
+//! #### DataFrameCacher
+//!
+//! A utility designed for caching and retrieving data stored in a structured format known as `DataFrame`. It shines in scenarios where data generation can be time-consuming, such as fetching data from external sources or performing resource-intensive computations.
+//!
+//! Usage
+//!
+//! To make the most of the `DataFrameCacher`, follow these steps:
+//!
+//! 1. **Create a data generator function**: Begin by creating a data generator function that returns a `Future` producing a `Result<DataFrame, Box<dyn Error>>`. This function will be responsible for generating the data you want to cache.
+//!
+//! 2. **Instantiate a `DataFrameCacher` with the `fetch_async` method**: Once you have your data generator function, you can create an instance of `DataFrameCacher` by providing the data generator function, cache path, and cache duration. If the data is still valid in the cache, it will be retrieved from there. Otherwise, the data generator function will be invoked to obtain fresh data, which will then be cached for future use.
+//!
+//! Example
+//!
+//! Below is an example demonstrating the first step of creating a data generator function:
+//!
+//! ```
+//! use rgwml::df_utils::{DataFrame, DataFrameCacher};
+//!
+//! // Define your asynchronous data generation function here
+//! async fn generate_my_data() -> Result<DataFrame, Box<dyn std::error::Error>> {
+//!     // Implement your data generation logic here
+//!     Ok(vec![])
+//! }
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!
+//!     let df = DataFrameCacher::fetch_async(
+//!         || Box::pin(generate_my_data()), // Data generator function
+//!         "/path/to/your/data.json", // Cache path
+//!         60, // Cache duration in minutes
+//!     ).await?;
+//!
+//!     dbg!(df);
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! Note
+//!
+//! The use of `|| Box` in the later example is essential. It allows you to encapsulate your data
+//! generation function within a closure and a `Box`. This is required because `DataFrameCacher`
+//! expects the data generator function to have a `'static` lifetime. Closures capture their
+//! environment, so by using `|| Box`, you ensure that both the closure and the function it
+//! captures can be moved into `DataFrameCacher`, satisfying the necessary lifetime constraints.
+//!
 //! ### ai_utils
 //!
 //! Dive into the world of AI with `fuzzai`, an asynchronous function that processes neural associations in parallel. Imagine analyzing the neural network's decision-making process in a world where AI has developed a fondness for classic video games!

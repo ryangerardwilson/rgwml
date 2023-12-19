@@ -3,6 +3,15 @@ use chrono::{DateTime, NaiveDateTime};
 use serde::ser::StdError;
 use serde_json::{json, Map, Number, Value};
 use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
+use std::time::{Duration, SystemTime};
+use std::error::Error;
+use std::pin::Pin;
+use std::future::Future;
+use std::marker::PhantomData;
+use std::fmt;
+use tokio::runtime::Runtime; 
 
 pub type DataFrame = Vec<HashMap<String, Value>>;
 
@@ -570,18 +579,17 @@ impl Query {
 ///
 /// // `grouped_dfs` will now contain two grouped DataFrames, one for each category (`Fruit` and `Vegetable`).
 /// ```
-
 pub struct Grouper<'a> {
     dataframe: &'a DataFrame,
 }
 
 impl<'a> Grouper<'a> {
-    // Constructor for Grouper
+    /// Constructor for Grouper
     pub fn new(dataframe: &'a DataFrame) -> Grouper<'a> {
         Grouper { dataframe }
     }
 
-    // Method to group the DataFrame
+    /// Method to group the DataFrame
     pub fn group_by(self, key: &str) -> HashMap<String, DataFrame> {
         let mut grouped_data: HashMap<String, DataFrame> = HashMap::new();
 
@@ -625,3 +633,156 @@ fn compare_values(a: &Value, b: &Value) -> std::cmp::Ordering {
         _ => std::cmp::Ordering::Equal,
     }
 }
+
+
+
+
+#[doc(hidden)]
+trait DataGenerator {
+    fn generate(&self) -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>>;
+}
+
+#[doc(hidden)]
+struct AsyncDataGenerator {
+    function: Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>> + Send + Sync>,
+}
+
+#[doc(hidden)]
+impl DataGenerator for AsyncDataGenerator {
+    fn generate(&self) -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>> {
+        (self.function)()
+    }
+}
+
+// DataFrameCacher struct
+/// A utility designed for caching and retrieving data stored in a structured format known as `DataFrame`. It shines in scenarios where data generation can be time-consuming, such as fetching data from external sources or performing resource-intensive computations.
+///
+/// Usage
+///
+/// To make the most of the `DataFrameCacher`, follow these steps:
+///
+/// 1. **Create a data generator function**: Begin by creating a data generator function that returns a `Future` producing a `Result<DataFrame, Box<dyn Error>>`. This function will be responsible for generating the data you want to cache.
+///
+/// 2. **Instantiate a `DataFrameCacher` with the `fetch_async` method**: Once you have your data generator function, you can create an instance of `DataFrameCacher` by providing the data generator function, cache path, and cache duration. If the data is still valid in the cache, it will be retrieved from there. Otherwise, the data generator function will be invoked to obtain fresh data, which will then be cached for future use.
+///
+/// Example
+///
+/// Below is an example demonstrating the first step of creating a data generator function:
+///
+/// ```rust
+/// use rgwml::df_utils::{DataFrame, DataFrameCacher};
+///
+/// // Define your asynchronous data generation function here
+/// async fn generate_my_data() -> Result<DataFrame, Box<dyn std::error::Error>> {
+///     // Implement your data generation logic here
+///     Ok(vec![])
+/// }
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///
+///     let df = DataFrameCacher::fetch_async(
+///         || Box::pin(generate_my_data()), // Data generator function
+///         "/path/to/your/data.json", // Cache path
+///         60, // Cache duration in minutes
+///     ).await?;
+///
+///     dbg!(df);
+///
+///     Ok(())
+/// }
+/// ```
+///
+/// ## Note
+///
+/// The use of `|| Box` in the later example is essential. It allows you to encapsulate your data
+/// generation function within a closure and a `Box`. This is required because `DataFrameCacher`
+/// expects the data generator function to have a `'static` lifetime. Closures capture their
+/// environment, so by using `|| Box`, you ensure that both the closure and the function it
+/// captures can be moved into `DataFrameCacher`, satisfying the necessary lifetime constraints.
+///
+pub struct DataFrameCacher {
+    data_generator: Box<dyn DataGenerator + Send + Sync>,
+    cache_path: String,
+    cache_duration: Duration,
+}
+
+#[doc(hidden)]
+impl fmt::Debug for DataFrameCacher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DataFrameCacher")
+         .field("data_generator", &"Box<dyn DataGenerator + Send + Sync>")
+         .field("cache_path", &self.cache_path)
+         .field("cache_duration", &self.cache_duration)
+         .finish()
+    }
+}
+
+impl DataFrameCacher {
+
+    /// Asynchronously fetches data from cache or generates and caches fresh data.
+    pub async fn fetch_async<F>(
+        data_generator: F,
+        cache_path: &str,
+        cache_duration_minutes: u64,
+    ) -> Result<DataFrame, Box<dyn Error>>
+    where
+        F: Fn() -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>> + Send + Sync + 'static,
+    {
+        let cacher = Self::new_async(data_generator, cache_path.to_string(), cache_duration_minutes);
+        cacher.fetch_data().await?;
+        Ok(cacher.fetch_data().await?)
+    }
+
+    /// Creates a new DataFrameCacher instance for asynchronous data generation and caching.
+    pub fn new_async<F>(
+        data_generator: F,
+        cache_path: String,
+        cache_duration_minutes: u64,
+    ) -> Self
+    where
+        F: Fn() -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>> + Send + Sync + 'static,
+    {
+        DataFrameCacher {
+            data_generator: Box::new(AsyncDataGenerator {
+                function: Box::new(data_generator),
+            }),
+            cache_path,
+            cache_duration: Duration::from_secs(cache_duration_minutes * 60),
+        }
+    }
+
+    /// Fetches data from the cache if it's valid; otherwise, generates and caches fresh data.
+    pub async fn fetch_data(&self) -> Result<DataFrame, Box<dyn Error>> {
+        if self.is_cache_valid() {
+            println!("Fetching data from cache.");
+            let cached_data = fs::read_to_string(&self.cache_path)?;
+            serde_json::from_str(&cached_data).map_err(|e| e.into())
+        } else {
+            println!("Fetching new data.");
+            let data_frame = self.data_generator.generate().await?;
+            self.cache_data(&data_frame)?;
+            Ok(data_frame)
+        }
+    }
+
+    /// Checks if the cache is still valid based on cache duration.
+    fn is_cache_valid(&self) -> bool {
+        if let Ok(metadata) = fs::metadata(&self.cache_path) {
+            if let Ok(modified) = metadata.modified() {
+                if SystemTime::now().duration_since(modified).unwrap_or(Duration::MAX) < self.cache_duration {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Caches the provided data frame.
+    fn cache_data(&self, data_frame: &DataFrame) -> Result<(), Box<dyn Error>> {
+        let serialized_data = serde_json::to_string(data_frame)?;
+        fs::write(&self.cache_path, serialized_data)?;
+        Ok(())
+    }
+}
+
