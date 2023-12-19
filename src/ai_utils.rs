@@ -1,11 +1,16 @@
+//ai_utils.rs
+use crate::df_utils::DataFrame;
 use futures::future::join_all;
 use fuzzywuzzy::fuzz;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+
+//pub type DataFrame = Vec<HashMap<String, Value>>;
 
 /// The `NeuralAssociations2D` struct represents a basic structure for a two-dimensional neural network model.
 /// It consists of two primary fields: `input` and `output`. These fields are designed to work with string representations
@@ -111,7 +116,8 @@ pub enum WordLengthSensitivity {
 /// decision-making process in a concurrent environment.
 ///
 /// # Arguments
-/// - `neural_associations`: A slice of `NeuralAssociations2D`, representing the training data.
+/// - `neural_associations_dataframe`: A `DataFrame` (Vec<HashMap<String, Value>>), representing the training data.
+///   Each `HashMap` should have keys corresponding to the `input` and `output` fields of `NeuralAssociations2D`.
 /// - `text_in_focus`: A string reference, typically the text to be analyzed or compared against the training data.
 /// - `task_name`: A descriptive name for the task, used primarily for logging or tracking purposes.
 /// - `split_upto`: A `SplitUpto` enum to define the minimal size of text permutations for processing.
@@ -123,10 +129,19 @@ pub enum WordLengthSensitivity {
 ///
 /// # Examples
 ///
+/// ## Preparing the DataFrame
+/// ```rust
+/// let mut data_frame = Vec::new();
+/// let mut record = HashMap::new();
+/// record.insert("input".to_string(), Value::String("Example input".to_string()));
+/// record.insert("output".to_string(), Value::String("Example output".to_string()));
+/// data_frame.push(record);
+/// ```
+///
 /// ## Using `None` for `WordLengthSensitivity`
 /// ```rust
 /// let result = fuzzai(
-///     &neural_associations,
+///     data_frame,
 ///     "Example text",
 ///     "Sample Task",
 ///     SplitUpto::WordSetLength(5),
@@ -138,7 +153,7 @@ pub enum WordLengthSensitivity {
 /// ## Using a `Coefficient` value
 /// ```rust
 /// let result = fuzzai(
-///     &neural_associations,
+///     data_frame,
 ///     "Example text",
 ///     "Sample Task",
 ///     SplitUpto::WordSetLength(5),
@@ -150,7 +165,8 @@ pub enum WordLengthSensitivity {
 /// # Returns
 /// - A `Result` containing a `String` upon success, or an error wrapped in a `Box<dyn Error>` upon failure.
 pub async fn fuzzai<'a>(
-    neural_associations: &'a [NeuralAssociations2D],
+    neural_associations_dataframe: DataFrame,
+    //neural_associations: &'a [NeuralAssociations2D],
     text_in_focus: &str,
     task_name: &str,
     split_upto: SplitUpto,
@@ -341,14 +357,28 @@ pub async fn fuzzai<'a>(
         }
     }
 
+    let neural_associations: Vec<NeuralAssociations2D> = neural_associations_dataframe
+        .into_iter()
+        .map(|row| serde_json::from_value(serde_json::to_value(row).unwrap()).unwrap())
+        .collect();
+
     let data_arc = Arc::new(neural_associations);
 
     let mut futures = Vec::new();
 
     let data_arc_clone = Arc::clone(&data_arc);
+    let boxed_slice: Box<[NeuralAssociations2D]> = data_arc_clone.to_vec().into_boxed_slice();
+
+    let raw_slice: *const [NeuralAssociations2D] = Box::leak(boxed_slice);
+    let static_slice: &'static [NeuralAssociations2D] = unsafe { &*raw_slice };
+
+    let data_slice: Arc<&[NeuralAssociations2D]> = Arc::new(static_slice);
+
+    //let data_arc_clone = Arc::clone(&data_arc);
     let future = process_message_concurrently(
         text_in_focus,
-        data_arc_clone,
+        Arc::clone(&data_slice),
+        //data_arc_clone,
         &split_upto,
         &task_name,
         &show_complications,
@@ -382,4 +412,90 @@ pub async fn fuzzai<'a>(
     } else {
         Ok("{}".to_string())
     }
+}
+
+/// Configuration for mapping a DataFrame to a `NeuralAssociations2D` DataFrame.
+///
+/// This struct is used to specify the column names in the original DataFrame
+/// that correspond to the `input` and `output` fields of the `NeuralAssociations2D` structure.
+///
+/// # Fields
+/// * `input_column` - The name of the column in the original DataFrame to use as the `input`.
+/// * `output_column` - The name of the column in the original DataFrame to use as the `output`.
+///
+/// # Examples
+///
+/// ```
+/// let config = NeuralAssociations2DDataFrameConfig {
+///     input_column: "address",
+///     output_column: "name",
+/// };
+/// ```
+pub struct NeuralAssociations2DDataFrameConfig {
+    pub input_column: &'static str,
+    pub output_column: &'static str,
+}
+
+/// Converts a given DataFrame to a `NeuralAssociations2D` DataFrame.
+///
+/// This function takes a DataFrame and a `NeuralAssociations2DDataFrameConfig`,
+/// and creates a new DataFrame where each record is a HashMap representing a `NeuralAssociations2D` object.
+/// The `input` and `output` fields of each object are filled based on the specified columns
+/// in the original DataFrame.
+///
+/// # Arguments
+/// * `data_frame` - The original DataFrame to convert.
+/// * `config` - Configuration specifying which columns to map to `input` and `output`.
+///
+/// # Returns
+/// A new DataFrame where each record represents a `NeuralAssociations2D` object.
+///
+/// # Example
+///
+/// ```
+/// use rgwml::df_utils::DataFrame;
+/// use rgwml::ai_utils::{NeuralAssociations2DDataFrameConfig, create_neural_associations_2d_df}
+///
+/// let mut data_frame = Vec::new();
+/// let mut record = HashMap::new();
+/// record.insert("address".to_string(), Value::String("123 Main St".to_string()));
+/// record.insert("name".to_string(), Value::String("John Doe".to_string()));
+/// data_frame.push(record);
+///
+/// let config = NeuralAssociations2DDataFrameConfig {
+///     input_column: "address",
+///     output_column: "name",
+/// };
+///
+/// let neural_association_df = create_neural_associations_2d_df(data_frame, config);
+/// ```
+pub fn create_neural_associations_2d_df(
+    data_frame: DataFrame,
+    config: NeuralAssociations2DDataFrameConfig,
+) -> DataFrame {
+    let mut neural_association_df = Vec::new();
+
+    for record in data_frame.iter() {
+        let input_column = config.input_column.to_string();
+        let output_column = config.output_column.to_string();
+
+        let input_value = record
+            .get(&input_column)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+
+        let output_value = record
+            .get(&output_column)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+
+        let mut new_row = HashMap::new();
+        new_row.insert("input".to_string(), Value::String(input_value));
+        new_row.insert("output".to_string(), Value::String(output_value));
+        neural_association_df.push(new_row);
+    }
+
+    neural_association_df
 }

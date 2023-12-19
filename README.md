@@ -5,12 +5,12 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 ## Modules Overview
 
 ### `df_utils`
-- **Purpose**: Replicate Python Pandas library functionality in Rust.
-- **Features**: The Query and Grouper structs ease data manipulation, transformation, filtering, sorting, and aggregation.
+- **Purpose**: Replicate Python Pandas library and Jypiter Notebook functionality in Rust.
+- **Features**: The Query and Grouper structs ease data manipulation, transformation, filtering, sorting, and aggregation, as DataFrames. The DataFrameCacher struct allows you to gracefully cache and retrieve results of functions that return a Dataframe.
 
 ### `ai_utils`
 - **Purpose**: Leverage Rust's concurrency for AI/Graph Theory based analysis.
-- **Features**: Perform complex data analyses and process neural associations in parallel, harnessing Rust's performance and safety.
+- **Features**: Perform complex data analyses and process neural associations in parallel, harnessing Rust's performance and safety - all while playing well with the `df_utils` library.
 
 ### `api_utils`
 - **Purpose**: Gracefully make and cache API calls.

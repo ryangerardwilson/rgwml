@@ -3,12 +3,12 @@ use chrono::{DateTime, NaiveDateTime};
 use serde::ser::StdError;
 use serde_json::{json, Map, Number, Value};
 use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::time::{Duration, SystemTime};
 use std::error::Error;
-use std::pin::Pin;
-use std::future::Future;
 use std::fmt;
+use std::fs;
+use std::future::Future;
+use std::pin::Pin;
+use std::time::{Duration, SystemTime};
 
 pub type DataFrame = Vec<HashMap<String, Value>>;
 
@@ -631,9 +631,6 @@ fn compare_values(a: &Value, b: &Value) -> std::cmp::Ordering {
     }
 }
 
-
-
-
 #[doc(hidden)]
 trait DataGenerator {
     fn generate(&self) -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>>;
@@ -641,7 +638,9 @@ trait DataGenerator {
 
 #[doc(hidden)]
 struct AsyncDataGenerator {
-    function: Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>> + Send + Sync>,
+    function: Box<
+        dyn Fn() -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>> + Send + Sync,
+    >,
 }
 
 #[doc(hidden)]
@@ -692,7 +691,7 @@ impl DataGenerator for AsyncDataGenerator {
 ///
 /// ## Note
 ///
-/// The use of `|| Box` in the later example is essential. It allows you to encapsulate your data
+/// The use of `|| Box` in the example is essential. It allows you to encapsulate your data
 /// generation function within a closure and a `Box`. This is required because `DataFrameCacher`
 /// expects the data generator function to have a `'static` lifetime. Closures capture their
 /// environment, so by using `|| Box`, you ensure that both the closure and the function it
@@ -708,15 +707,14 @@ pub struct DataFrameCacher {
 impl fmt::Debug for DataFrameCacher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DataFrameCacher")
-         .field("data_generator", &"Box<dyn DataGenerator + Send + Sync>")
-         .field("cache_path", &self.cache_path)
-         .field("cache_duration", &self.cache_duration)
-         .finish()
+            .field("data_generator", &"Box<dyn DataGenerator + Send + Sync>")
+            .field("cache_path", &self.cache_path)
+            .field("cache_duration", &self.cache_duration)
+            .finish()
     }
 }
 
 impl DataFrameCacher {
-
     /// Asynchronously fetches data from cache or generates and caches fresh data.
     pub async fn fetch_async<F>(
         data_generator: F,
@@ -724,21 +722,27 @@ impl DataFrameCacher {
         cache_duration_minutes: u64,
     ) -> Result<DataFrame, Box<dyn Error>>
     where
-        F: Fn() -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>> + Send + Sync + 'static,
+        F: Fn() -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>>
+            + Send
+            + Sync
+            + 'static,
     {
-        let cacher = Self::new_async(data_generator, cache_path.to_string(), cache_duration_minutes);
+        let cacher = Self::new_async(
+            data_generator,
+            cache_path.to_string(),
+            cache_duration_minutes,
+        );
         cacher.fetch_data().await?;
         Ok(cacher.fetch_data().await?)
     }
 
     /// Creates a new DataFrameCacher instance for asynchronous data generation and caching.
-    pub fn new_async<F>(
-        data_generator: F,
-        cache_path: String,
-        cache_duration_minutes: u64,
-    ) -> Self
+    pub fn new_async<F>(data_generator: F, cache_path: String, cache_duration_minutes: u64) -> Self
     where
-        F: Fn() -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>> + Send + Sync + 'static,
+        F: Fn() -> Pin<Box<dyn Future<Output = Result<DataFrame, Box<dyn Error>>>>>
+            + Send
+            + Sync
+            + 'static,
     {
         DataFrameCacher {
             data_generator: Box::new(AsyncDataGenerator {
@@ -767,7 +771,11 @@ impl DataFrameCacher {
     fn is_cache_valid(&self) -> bool {
         if let Ok(metadata) = fs::metadata(&self.cache_path) {
             if let Ok(modified) = metadata.modified() {
-                if SystemTime::now().duration_since(modified).unwrap_or(Duration::MAX) < self.cache_duration {
+                if SystemTime::now()
+                    .duration_since(modified)
+                    .unwrap_or(Duration::MAX)
+                    < self.cache_duration
+                {
                     return true;
                 }
             }
@@ -782,4 +790,3 @@ impl DataFrameCacher {
         Ok(())
     }
 }
-

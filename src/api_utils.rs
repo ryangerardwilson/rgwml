@@ -42,7 +42,7 @@ use std::str::FromStr;
 ///         .await
 ///         .unwrap();
 ///
-///     println!("Response from server: {}", response);
+///     dbg!(response);
 /// }
 /// ```
 ///
@@ -74,7 +74,7 @@ use std::str::FromStr;
 ///         .await
 ///         .unwrap();
 ///
-///     println!("Response from server: {}", response);
+///     dbg!(response);
 /// }
 /// ```
 ///
