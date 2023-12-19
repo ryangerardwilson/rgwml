@@ -1,29 +1,40 @@
 // df_utils.rs
 use chrono::{DateTime, NaiveDateTime};
+use csv::{Writer, WriterBuilder};
 use serde::ser::StdError;
 use serde_json::{json, Map, Number, Value};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 use std::fs;
+use std::fs::File;
 use std::future::Future;
 use std::pin::Pin;
 use std::time::{Duration, SystemTime};
 
+/// A `DataFrame` is a collection of data organized into a tabular structure, where each row is represented as a `HashMap`.
+///
+/// Each `HashMap` in the `DataFrame` corresponds to a single row in the table, with the key being the column name and the value being the data in that column for the row. The `Value` type from `serde_json` is used to allow for flexibility in the types of data that can be stored in the table, ranging from simple scalar types like strings and numbers to more complex nested structures like arrays and objects.
+///
+/// This structure is particularly useful for handling and manipulating structured data, especially when working with JSON data or when preparing data for serialization/deserialization.
+///
+/// # Example
+///
+/// ```
+/// let mut row = HashMap::new();
+/// row.insert("Name".to_string(), Value::String("John Doe".to_string()));
+/// row.insert("Age".to_string(), Value::Number(30.into()));
+///
+/// let data_frame = vec![row];
+/// ```
+///
+/// In this example, `data_frame` is a `DataFrame` with a single row, containing two columns: "Name" and "Age".
 pub type DataFrame = Vec<HashMap<String, Value>>;
 
 /// Converts a DataFrame into a serde_json Value::Array.
 ///
 /// This function takes a DataFrame as input and converts it into a Value::Array,
 /// where each element is a Value::Object constructed from the HashMap entries.
-///
-/// # Arguments
-///
-/// * `data_frame` - A DataFrame to convert.
-///
-/// # Returns
-///
-/// A serde_json Value::Array containing the converted data.
 ///
 /// # Example
 ///
@@ -41,6 +52,56 @@ pub fn dataframe_to_value_array(data_frame: DataFrame) -> Value {
             })
             .collect(),
     )
+}
+
+/// Writes a DataFrame to a CSV file at the specified path.
+///
+/// This function takes a DataFrame and a file path, converts the DataFrame to CSV format,
+/// and writes it to the file.
+///
+/// # Example
+///
+/// ```
+/// let df = vec![HashMap::from([("key1".to_string(), Value::String("value1".to_string()))])];
+/// dataframe_to_csv(df, "path/to/file.csv").expect("Failed to write CSV");
+/// ```
+pub fn dataframe_to_csv(data_frame: DataFrame, file_path: &str) -> Result<(), Box<dyn Error>> {
+    fn value_to_string(value: &Value) -> String {
+        match value {
+            Value::String(s) => s.clone(),
+            _ => value.to_string(),
+        }
+    }
+
+    let file = File::create(file_path)?;
+    let mut wtr = Writer::from_writer(file);
+
+    let headers: Vec<String> = if let Some(first_record) = data_frame.first() {
+        first_record.keys().cloned().collect()
+    } else {
+        // If there are no records, just return Ok
+        return Ok(());
+    };
+
+    // Write headers to CSV
+    wtr.write_record(&headers)?;
+
+    for record in &data_frame {
+        // Extract values in the order of the headers
+        let values: Vec<String> = headers
+            .iter()
+            .map(|key| {
+                record
+                    .get(key)
+                    .map_or_else(|| "".to_string(), |v| value_to_string(v))
+            })
+            .collect();
+
+        wtr.write_record(&values)?;
+    }
+
+    wtr.flush()?;
+    Ok(())
 }
 
 /// Converts a JSON string into a DataFrame.

@@ -24,6 +24,45 @@
 //!
 //! ### df_utils
 //!
+//! #### DataFrame
+//!
+//! A `DataFrame` is a collection of data organized into a tabular structure, where each row is represented as a `HashMap`.
+//!
+//! Each `HashMap` in the `DataFrame` corresponds to a single row in the table, with the key being the column name and the value being the data in that column for the row. The `Value` type from `serde_json` is used to allow for flexibility in the types of data that can be stored in the table, ranging from simple scalar types like strings and numbers to more complex nested structures like arrays and objects.
+//!
+//! This structure is particularly useful for handling and manipulating structured data, especially when working with JSON data or when preparing data for serialization/deserialization.
+//!
+//! Example
+//! ```
+//!     let mut row = HashMap::new();
+//!     row.insert("Name".to_string(), Value::String("John Doe".to_string()));
+//!     row.insert("Age".to_string(), Value::Number(30.into()));
+//!     let data_frame = vec![row];
+//! ```
+//!
+//! #### fn data_frame_to_value_array()
+//!
+//! Converts a DataFrame into a serde_json Value::Array. This function takes a DataFrame as input and converts it into a Value::Array, where each element is a Value::Object constructed from the HashMap entries.
+//!
+//! Example
+//! ```
+//!     let df = vec![HashMap::from([("key1".to_string(), Value::String("value1".to_string()))])];
+//!     let value_array = data_frame_to_value_array(df);
+//! ```
+//!
+//! #### fn dataframe_to_csv()
+//!
+//! Writes a DataFrame to a CSV file at the specified path.
+//!
+//! This function takes a DataFrame and a file path, converts the DataFrame to CSV format, and writes it to the file.
+//!
+//! Example
+//!
+//! ```
+//!     let df = vec![HashMap::from([("key1".to_string(), Value::String("value1".to_string()))])];
+//!     dataframe_to_csv(df, "path/to/file.csv").expect("Failed to write CSV");
+//! ```
+//!
 //! #### Query
 //!
 //! `Query` struct provides a fluent interface for querying and manipulating data within a `DataFrame`.

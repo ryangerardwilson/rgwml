@@ -316,7 +316,7 @@ pub async fn fuzzai<'a>(
 
         let mut max_similarity_per_output: HashMap<String, SimilarityResult> = HashMap::new();
 
-        dbg!(&results);
+        // dbg!(&results);
         for result_option in results {
             if let Some(result) = result_option {
                 let output = result.output.clone();
