@@ -1,6 +1,6 @@
 // df_utils.rs
 use chrono::{DateTime, NaiveDateTime};
-use csv::{Writer, WriterBuilder};
+use csv::Writer;
 use serde::ser::StdError;
 use serde_json::{json, Map, Number, Value};
 use std::collections::{HashMap, HashSet};
