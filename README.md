@@ -36,13 +36,13 @@ This structure is particularly useful for handling and manipulating structured d
 
 Example
 
-```
+
     let mut row = HashMap::new();
     row.insert("Name".to_string(), Value::String("John Doe".to_string()));
     row.insert("Age".to_string(), Value::Number(30.into()));
 
     let data_frame = vec![row];
-```
+
 
 #### fn data_frame_to_value_array()
 
@@ -52,10 +52,10 @@ This function takes a DataFrame as input and converts it into a Value::Array, wh
 
 Example
 
-```
+
     let df = vec![HashMap::from([("key1".to_string(), Value::String("value1".to_string()))])];
     let value_array = data_frame_to_value_array(df);
-```
+
 
 #### fn dataframe_to_csv()
 
@@ -65,10 +65,10 @@ This function takes a DataFrame and a file path, converts the DataFrame to CSV f
 
 Example
 
-```
+
     let df = vec![HashMap::from([("key1".to_string(), Value::String("value1".to_string()))])];
     dataframe_to_csv(df, "path/to/file.csv").expect("Failed to write CSV");
-```
+
 
 ### Query
 
@@ -96,7 +96,7 @@ In this example, we create a `Query` instance and utilize its various features:
 - Convert date-time columns to a standardized format.
 
 Example
-```
+
     use std::collections::HashMap;
     use serde_json::Value;
     use rgwml::df_utils::{Dataframe, Query};
@@ -114,7 +114,7 @@ Example
      .execute(); // Executing the query
 
     // `result` now contains a DataFrame with the specified columns, conditions, sorting, and limits applied.
-    ```
+    
 
     Note: This example assumes the existence of a `DataFrame` type and relevant methods. Replace placeholder code with actual implementations as per your project's context.
 
@@ -123,7 +123,7 @@ Example
 A utility for grouping rows in a DataFrame based on a specified key. `Grouper` provides a way to categorize and segment data within a DataFrame, where the DataFrame is a collection of rows, and each row is a `HashMap<String, Value>`. It simplifies the process of aggregating, analyzing, or further manipulating data based on grouped criteria.
 
 Example
-```
+
     use std::collections::HashMap;
     use rgwml::df_utils::{Grouper, DataFrame, convert_json_string_to_dataframe};
 
@@ -134,7 +134,7 @@ Example
     let grouped_dfs = grouper.group_by("category");
 
     // `grouped_dfs` will now contain two grouped DataFrames, one for each category (`Fruit` and `Vegetable`).
-```
+
 
 ### DataFrameCacher
 
@@ -152,7 +152,7 @@ Example
 
 Below is an example demonstrating the first step of creating a data generator function:
 
-```
+
     use rgwml::df_utils::{DataFrame, DataFrameCacher};
 
     // Define your asynchronous data generation function here
@@ -174,7 +174,7 @@ Below is an example demonstrating the first step of creating a data generator fu
 
     Ok(())
     }
-```
+
 Note: The use of `|| Box` in the example is essential. It allows you to encapsulate your data generation function within a closure and a `Box`. This is required because `DataFrameCacher` expects the data generator function to have a `'static` lifetime. Closures capture their environment, so by using `|| Box`, you ensure that both the closure and the function it captures can be moved into `DataFrameCacher`, satisfying the necessary lifetime constraints.
 
 3. ai_utils
@@ -193,7 +193,7 @@ First, convert your data into a suitable `DataFrame` format. Then, analyze the d
 
 Example
 
-```
+
     use rgwml::ai_utils::{NeuralAssociations2DDataFrameConfig, create_neural_associations_2d_df, fuzzai, SplitUpto, ShowComplications, WordLengthSensitivity};
     use rgwml::df_utils::DataFrame;
     use std::collections::HashMap;
@@ -230,7 +230,7 @@ Example
 
      dbg!(result);
 }
-```
+
 
 This integrated example demonstrates the full process of data transformation and analysis, highlighting the capabilities of the `rgwml` library in neural association studies. This library is perfect for applications where AI's interpretation of data patterns and decision-making processes are crucial.
 
@@ -240,7 +240,7 @@ This integrated example demonstrates the full process of data transformation and
 This module features the APICallBuilder a fluent interface to build API requests with support for method chaining. It simplifies the process by allowing you to specify both headers and payload as `serde_json::Value`. This approach is convenient when dealing with JSON data, making it easy to construct requests dynamically. If caching is enabled, responses are stored and reused for subsequent requests made within the specified cache duration.
 
 Example 1: Without Headers
-```
+
     use serde_json::json;
     use rgwml::api_utils::ApiCallBuilder;
 
@@ -264,10 +264,10 @@ Example 1: Without Headers
      
         dbg!(response);
     }
-```
+
 
 Example 2: With Headers
-```
+
     use reqwest::Method;
     use serde_json::json;
     use rgwml::api_utils::ApiCallBuilder;
@@ -297,7 +297,7 @@ Example 2: With Headers
 
         dbg!(response);
     }
-```
+
 
 These examples demonstrate how to use the ApiCallBuilder with and without custom headers. Since the headers and payload are specified as `serde_json::Value`, it offers flexibility in constructing various types of requests.
 
@@ -308,14 +308,14 @@ Note: Be cautious when caching POST requests, as they typically send unique data
 
 This module features the CsvBuilder, a fluent interface for creating and writing to CSV files.
 
-```
+
     use rgwml::csv_utils::CsvBuilder;
 
     let result = CsvBuilder::new("/path/to/your/file.csv")
         .set_header(&["Column1", "Column2", "Column3"])
         .add_row(&["Row1-1", "Row1-2", "Row1-3"])
         .add_rows(&[&["Row2-1", "Row2-2", "Row2-3"], &["Row3-1", "Row3-2", "Row3-3"]]);
-```
+
 
 This example demonstrates creating a new CSV file, setting its header, adding individual rows, and a collection of rows. The builder pattern allows for these methods to be chained for ease of use.
 
