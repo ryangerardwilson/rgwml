@@ -246,7 +246,7 @@ Example 1: Without Headers
 
     #[tokio::main]
     async fn main() {
-        let method = "POST"; // Or "GET", "PUT", "DELETE"
+        let method = "POST"; // Or "GET"
         let url = "http://example.com/api/submit";
         let payload = json!({
             "field1": "Hello",
@@ -274,7 +274,7 @@ Example 2: With Headers
 
     #[tokio::main]
     async fn main() {
-        let method = "POST"; // Or "GET", "PUT", "DELETE"
+        let method = "POST"; // Or "GET"
         let url = "http://example.com/api/submit";
         let headers = json!({
             "Content-Type": "application/json",
@@ -298,6 +298,35 @@ Example 2: With Headers
         dbg!(response);
     }
 
+Example 3: With application/x-www-form-urlencoded Content-Type
+
+    use serde_json::json;
+    use rgwml::api_utils::ApiCallBuilder;
+    use std::collections::HashMap;
+
+    #[tokio::main]
+    async fn main() {
+        let method = "POST"; // Or "GET"
+        let url = "http://example.com/api/submit";
+        let headers = json!({
+            "Content-Type": "application/x-www-form-urlencoded"
+        });
+        let payload = json!({
+            "field1": "value1",
+            "field2": "value2"
+        });
+        let response = ApiCallBuilder::call(
+            method,            
+            url, 
+            Some(headers),
+            Some(payload)
+        ).maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
+         .execute()
+         .await
+         .unwrap();
+        
+        dbg!(response);
+    }
 
 These examples demonstrate how to use the ApiCallBuilder with and without custom headers. Since the headers and payload are specified as `serde_json::Value`, it offers flexibility in constructing various types of requests.
 

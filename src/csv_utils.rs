@@ -1,6 +1,6 @@
 // csv_utils.rs
 use crate::df_utils::DataFrame;
-use csv::{Writer};
+use csv::Writer;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;

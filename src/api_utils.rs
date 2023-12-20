@@ -3,7 +3,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::{Client, Response};
 // use serde::Serialize;
 use serde_json::{Map, Value as JsonValue};
-// use std::collections::HashMap;
+use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::fs;
 use std::str::FromStr;
@@ -25,7 +25,7 @@ use std::str::FromStr;
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let method = "POST"; // Or "GET", "PUT", "DELETE"
+///     let method = "POST"; // Or "GET"
 ///     let url = "http://example.com/api/submit";
 ///     let payload = json!({
 ///         "field1": "Hello",
@@ -53,7 +53,7 @@ use std::str::FromStr;
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let method = "POST"; // Or "GET", "PUT", "DELETE"
+///     let method = "POST"; // Or "GET"
 ///     let url = "http://example.com/api/submit";
 ///     let headers = json!({
 ///         "Content-Type": "application/json",
@@ -68,6 +68,37 @@ use std::str::FromStr;
 ///             url,
 ///             Some(headers), // Custom headers
 ///             Some(payload)
+///         )
+///         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
+///         .execute()
+///         .await
+///         .unwrap();
+///
+///     dbg!(response);
+/// }
+/// ```
+/// Example 3: With application/x-www-form-urlencoded Content-Type
+/// ```
+/// use serde_json::json;
+/// use rgwml::api_utils::ApiCallBuilder;
+/// use std::collections::HashMap;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let method = "POST"; // Or "GET"
+///     let url = "http://example.com/api/submit";
+///     let headers = json!({
+///         "Content-Type": "application/x-www-form-urlencoded"
+///     });
+///     let payload = json!({
+///         "field1": "value1",
+///         "field2": "value2"
+///     });
+///     let response = ApiCallBuilder::call(
+///             method,            
+///             url, 
+///             Some(headers),
+///             Some(payload) // Payload as form data
 ///         )
 ///         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
 ///         .execute()
@@ -152,6 +183,71 @@ impl ApiCallBuilder {
         let client = Client::new();
         let mut request_builder = client.request(reqwest_method, &self.url);
 
+        let mut is_form = false;
+        // Determine if Content-Type is application/x-www-form-urlencoded
+        let is_form_content_type = if let Some(ref header_json) = self.header_option {
+            //let mut is_form = false;
+
+            let header_map: HeaderMap = header_json
+                .as_object()
+                .unwrap_or(&Map::new())
+                .iter()
+                .map(|(k, v)| {
+                    let header_name = HeaderName::from_str(k).unwrap();
+                    let header_value = HeaderValue::from_str(v.as_str().unwrap()).unwrap();
+
+                    // Check Content-Type here
+                    if k == "Content-Type" && v == "application/x-www-form-urlencoded" {
+                        is_form = true;
+                    }
+
+                    (header_name, header_value)
+                })
+                .collect();
+
+            request_builder = request_builder.headers(header_map);
+            is_form
+        } else {
+            false
+        };
+
+        let payload_clone = self.payload.clone();
+
+        match self.method.as_str() {
+            "GET" => {
+                if let Some(query_params_json) = payload_clone {
+                    // Use query_params_json here for GET request
+                    let query_params = query_params_json
+                        .as_object()
+                        .ok_or("Invalid query parameters format")?
+                        .iter()
+                        .map(|(k, v)| (k, v.to_string()))
+                        .collect::<HashMap<_, _>>();
+                    request_builder = request_builder.query(&query_params);
+                }
+            }
+            "POST" | "PUT" => {
+                if let Some(body_json) = self.payload.clone() {
+                    // Use body_json here for POST or PUT request
+                    if is_form_content_type {
+                        // Convert JSON payload to form data if Content-Type is application/x-www-form-urlencoded
+                        let form_data: HashMap<String, String> = serde_json::from_value(body_json)
+                            .map_err(|e| Box::new(e) as Box<dyn StdError>)?;
+                        request_builder = request_builder.form(&form_data);
+                    } else {
+                        // Use JSON payload
+                        request_builder = request_builder.json(&body_json);
+                    }
+                }
+            }
+            _ => {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Unsupported HTTP method",
+                )))
+            }
+        }
+
         // Convert JsonValue to HeaderMap
         if let Some(header_json) = self.header_option {
             let header_map: HeaderMap = header_json
@@ -167,12 +263,24 @@ impl ApiCallBuilder {
             request_builder = request_builder.headers(header_map);
         }
 
-        // Handle payload for POST, PUT
+        // Handle payload for POST, PUT based on Content-Type
         if ["POST", "PUT"].contains(&self.method.as_str()) {
             if let Some(payload_json) = self.payload {
-                request_builder = request_builder.json(&payload_json);
+                if is_form_content_type {
+                    // Convert JSON payload to form data if Content-Type is application/x-www-form-urlencoded
+                    let form_data: HashMap<String, String> =
+                        serde_json::from_value(payload_json)
+                            .map_err(|e| Box::new(e) as Box<dyn StdError>)?;
+                    request_builder = request_builder.form(&form_data);
+                    dbg!(&is_form, &form_data);
+                } else {
+                    // Use JSON payload
+                    request_builder = request_builder.json(&payload_json);
+                }
             }
         }
+
+        //dbg!(&request_builder);
 
         // Send the request and process the response
         let response: Response = request_builder
