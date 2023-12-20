@@ -308,16 +308,33 @@ Note: Be cautious when caching POST requests, as they typically send unique data
 
 This module features the CsvBuilder, a fluent interface for creating and writing to CSV files.
 
-
+    // Create a CsvBuilder instance for a new CSV file
     use rgwml::csv_utils::CsvBuilder;
 
-    let result = CsvBuilder::new("/path/to/your/file.csv")
-        .set_header(&["Column1", "Column2", "Column3"])
-        .add_row(&["Row1-1", "Row1-2", "Row1-3"])
-        .add_rows(&[&["Row2-1", "Row2-2", "Row2-3"], &["Row3-1", "Row3-2", "Row3-3"]]);
+    let builder = CsvBuilder::new()
+        .set_header(&["Column3", "Column1", "Column2"]) // Set CSV header
+        .add_rows(&[&["Row2-3", "Row2-1", "Row2-2"], &["Row1-3", "Row1-1", "Row1-2"]]) // Add multiple rows
+        .column_order(vec!["Column1", "Column2", "...", "Column3"]) // Manipulate column order
+        .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")]); // Sort the data, must be called after column_order
+        .save_as("/path/to/your/file.csv");
 
+    // Create a CsvBuilder instance from a DataFrame
+    use rgwml::csv_utils::CsvBuilder;
+    use rgwml::df_utils::DataFrame; 
 
-This example demonstrates creating a new CSV file, setting its header, adding individual rows, and a collection of rows. The builder pattern allows for these methods to be chained for ease of use.
+    let data_frame = // Your DataFrame initialization here
+    let builder = CsvBuilder::from_dataframe(data_frame)
+        .set_header(&["Column1", "Column2", "Column3"]) // Set CSV header
+        .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]]) // Add data rows
+        .save_as("/path/to/your/file.csv"); // Save the CSV data to a file
+
+    // Create a CsvBuilder instance from an existing csv path
+    use rgwml::csv_utils::CsvBuilder;
+
+    let builder = CsvBuilder::from_csv("/path/to/existing/file.csv")
+        .set_header(&["NewColumn1", "NewColumn2", "NewColumn3"]) // Set a new header
+        .add_row(&["NewRow1-1", "NewRow1-2", "NewRow1-3"]) // Add a new row
+        .save_as("/path/to/your/file.csv"); // Save the modified CSV data to a new file
 
 6. License
 ----------
