@@ -1,12 +1,10 @@
 // csv_utils.rs
 use crate::df_utils::DataFrame;
-use csv::{Reader, StringRecord, Writer};
-use serde_json::Value;
+use csv::{Writer};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs::File;
-use std::io::{self, Write};
 
 /// A flexible builder for creating and writing to CSV files.
 ///
