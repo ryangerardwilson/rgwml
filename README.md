@@ -308,7 +308,8 @@ Note: Be cautious when caching POST requests, as they typically send unique data
 
 This module features the CsvBuilder, a fluent interface for creating and writing to CSV files.
 
-    // Create a CsvBuilder instance for a new CSV file
+Create a CsvBuilder instance for a new CSV file
+
     use rgwml::csv_utils::CsvBuilder;
 
     let builder = CsvBuilder::new()
@@ -318,7 +319,8 @@ This module features the CsvBuilder, a fluent interface for creating and writing
         .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")]); // Sort the data, must be called after column_order
         .save_as("/path/to/your/file.csv");
 
-    // Create a CsvBuilder instance from a DataFrame
+Create a CsvBuilder instance from a DataFrame
+
     use rgwml::csv_utils::CsvBuilder;
     use rgwml::df_utils::DataFrame; 
 
@@ -328,7 +330,8 @@ This module features the CsvBuilder, a fluent interface for creating and writing
         .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]]) // Add data rows
         .save_as("/path/to/your/file.csv"); // Save the CSV data to a file
 
-    // Create a CsvBuilder instance from an existing csv path
+Create a CsvBuilder instance from an existing csv path
+
     use rgwml::csv_utils::CsvBuilder;
 
     let builder = CsvBuilder::from_csv("/path/to/existing/file.csv")
