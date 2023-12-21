@@ -2,10 +2,116 @@
 use crate::df_utils::DataFrame;
 use chrono::{DateTime, NaiveDateTime};
 use csv::Writer;
+use futures::executor::block_on;
+use futures::future::join_all;
+use fuzzywuzzy::fuzz;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs::File;
+use regex::Regex;
+
+/// Defines the trait for comparison values
+pub trait CompareValue {
+    fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool;
+}
+
+/// Implements CompareValue for a single string reference
+impl CompareValue for &str {
+    fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool {
+        // Simplified example, implement the logic as per your requirement
+                match compare_as {
+            "COMPARE_AS_TEXT" => match operation {
+                "==" => cell_value == *self,
+                "CONTAINS" => cell_value.contains(*self),
+                "STARTS_WITH" => cell_value.starts_with(*self),
+                _ => false,
+            },
+
+"COMPARE_AS_NUMBERS" => {
+                match (cell_value.parse::<f64>(), self.parse::<f64>()) {
+                    (Ok(n1), Ok(n2)) => match operation {
+                        "==" => n1 == n2,
+                        ">" => n1 > n2,
+                        "<" => n1 < n2,
+                        _ => false,
+                    },
+                    _ => {
+                        println!("Failed to parse as numbers: '{}' or '{}'", cell_value, self);
+                        false
+                    }
+                }
+            },
+
+            "COMPARE_AS_TIMESTAMPS" => {
+                let parsed_row_value = CsvBuilder::parse_timestamp(cell_value);
+                let parsed_compare_value = CsvBuilder::parse_timestamp(self);
+
+                match (parsed_row_value, parsed_compare_value) {
+                    (Ok(row_date), Ok(compare_date)) => match operation {
+                        "==" => row_date == compare_date,
+                        ">" => row_date > compare_date,
+                        "<" => row_date < compare_date,
+                        _ => false,
+                    },
+                    _ => {
+                        println!("Error comparing timestamps. Unable to parse '{}' or '{}' as timestamps.", cell_value, self);
+                        false
+                    }
+                }
+            },
+                    _ => false,
+                }
+    }
+}
+
+/// Implements CompareValue for a Vec<&str> reference
+impl CompareValue for Vec<&str> {
+    fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool {
+        if operation.starts_with("FUZZ_MIN_SCORE_") && compare_as == "COMPARE_AS_TEXT" {
+            // Extract the score threshold from the operation string
+            let score_threshold: i32 = operation["FUZZ_SCORE_".len()..].parse().unwrap_or(70);
+
+            // dbg!(&score_threshold);
+
+                        let re = Regex::new(r"[^a-zA-Z\s]").unwrap();
+
+            // Replace non-alphabet characters with nothing (effectively removing them)
+            let only_alpha = re.replace_all(cell_value, "");
+
+            // Trim, split on whitespace, and join to ensure single spaces between words
+            let cleaned_cell_value = only_alpha.trim().split_whitespace().collect::<Vec<&str>>().join(" ");
+            let words: Vec<&str> = cleaned_cell_value.split_whitespace().collect();
+            let mut all_scores = vec![];
+
+            for &value in self.iter() {
+                let value_word_count = value.split_whitespace().count();
+                let mut futures = vec![];
+
+                for len in value_word_count..=words.len() {
+                    for combination in words.windows(len) {
+                        let combined = combination.join(" ");
+                        let value_clone = value.to_string();
+                        futures.push(async move {
+                            fuzz::ratio(&combined, &value_clone)
+                        });
+                    }
+                }
+
+                let scores = block_on(join_all(futures));
+                all_scores.extend(scores);
+            }
+
+
+            let max_score = *all_scores.iter().max().unwrap_or(&0);
+            i32::from(max_score) >= score_threshold
+        } else {
+            false
+        }
+    }
+}
+
+
 
 /// A flexible builder for creating and writing to CSV files.
 ///
@@ -38,19 +144,27 @@ impl CsvBuilder {
             ".cascade_sort(vec![('Column1', 'DESC'), ('Column3', 'ASC')])",
             ".drop_columns(vec!['Column1', 'Column3'])",
             ".rename_columns(vec![('Column1', 'NewColumn1'), ('Column3', 'NewColumn3')])",
-            ".where_('column1', '==', '42', 'compare as numbers')",
-            ".where_('column1', '==', 'hello', 'compare as text')",
-            ".where_('column1', 'contains', 'apples', 'compare as text')",
-            ".where_('column1', '>', '23-01-01', 'compare as timestamps')",
+            ".where_('column1', '==', '42', 'COMPARE_AS_NUMBERS')",
+            ".where_('column1', '==', 'hello', 'COMPARE_AS_TEXT')",
+            ".where_('column1', 'CONTAINS', 'apples', 'COMPARE_AS_TEXT')",
+            ".where_('column1', 'STARTS_WITH', 'discounted', 'COMPARE_AS_TEXT')",
+            ".where_('stated_locality_address','FUZZ_MIN_SCORE_90',vec!['Shastri park','kamal nagar'], 'COMPARE_AS_TEXT') // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.",
+            ".where_('column1', '>', '23-01-01', 'COMPARE_AS_TIMESTAMPS')",
         ];
         options.sort();
 
         println!();
         println!("Available CsvBuilder chain options:");
         println!();
+
+            for option in &options {
+        let option_with_double_quotes = option.replace("'", "\"");
+        println!("  - {}", option_with_double_quotes);
+    }
+            /*
         for option in &options {
             println!("  - {}", option);
-        }
+        }*/
     }
 
     /// Creates a new `CsvBuilder` instance with empty headers and data.
@@ -433,78 +547,31 @@ impl CsvBuilder {
     }
 
     /// Filters the rows based on a column name, condition, value, and comparison type.
-    pub fn where_(
+    pub fn where_<T: CompareValue>(
         &mut self,
         column_name: &str,
         operation: &str,
-        value: &str,
+        value: T, // Accepts any type that implements CompareValue
         compare_as: &str,
     ) -> &mut Self {
         if let Some(column_index) = self.headers.iter().position(|h| h == column_name) {
-            // Replace the existing data with an empty vector to allow for filtering
             let original_data = std::mem::replace(&mut self.data, Vec::new());
 
             let filtered_data = original_data.into_iter().filter(|row| {
-
-
                 if let Some(cell_value) = row.get(column_index) {
-                    match compare_as {
-                        "compare as text" => match operation {
-                            "==" => cell_value == value,
-                            "contains" => cell_value.contains(value),
-                            _ => false,
-                        },
-                        "compare as numbers" => {
-                            match (cell_value.parse::<f64>(), value.parse::<f64>()) {
-                                (Ok(n1), Ok(n2)) => match operation {
-                                    "==" => n1 == n2,
-                                    ">" => n1 > n2,
-                                    "<" => n1 < n2,
-                                    _ => false,
-                                },
-                                _ => {
-                                    println!("Failed to parse as numbers: '{}' or '{}'", cell_value, value);
-                                    false
-                                }
-                            }
-                        },
-                        "compare as timestamps" => {
-                            let parsed_row_value = CsvBuilder::parse_timestamp(cell_value);
-                            let parsed_compare_value = CsvBuilder::parse_timestamp(value);
-
-                            match (parsed_row_value, parsed_compare_value) {
-                                (Ok(row_date), Ok(compare_date)) => match operation {
-                                    "==" => row_date == compare_date,
-                                    ">" => row_date > compare_date,
-                                    "<" => row_date < compare_date,
-                                    _ => false,
-                                },
-                                _ => {
-                                    println!("Error comparing timestamps. Unable to parse '{}' or '{}' as timestamps.", cell_value, value);
-                                    false
-                                }
-                            }
-                        },
-                        _ => {
-                            println!("Unknown comparison type: '{}'", compare_as);
-                            false
-                        }
-                    }
+                    value.apply(cell_value, operation, compare_as)
                 } else {
                     false
-                    // None.is_some()
-                    //println!("Column '{}' not found in row.", column_name);
-                    //false
                 }
             }).collect();
 
-            // Reassign the filtered data back to self.data
             self.data = filtered_data;
         } else {
             println!("Column '{}' not found in headers.", column_name);
         }
         self
     }
+
 
     /// Helper function to parse timestamps
     fn parse_timestamp(time_str: &str) -> Result<NaiveDateTime, String> {
@@ -537,3 +604,6 @@ impl CsvBuilder {
         }
     }
 }
+
+
+

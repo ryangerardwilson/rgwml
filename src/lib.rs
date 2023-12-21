@@ -385,6 +385,7 @@
 //!     .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
 //!     .drop_columns(vec!["UNUSED_COLUMN"])
 //!     .cascade_sort(vec![("COLUMN", "ASC")])
+//!     .where_("address","FUZZ_MIN_SCORE_70",vec!["new delhi","jerusalem"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
 //!     .print_row_count()
 //!     .save_as("/path/to/modified/file.csv");
 //! ```
@@ -412,7 +413,7 @@
 //! - **`.cascade_sort(sort_order: Vec<(&str, &str)>)`**: Sorts the data in the CSV file.
 //! - **`.drop_columns(columns: Vec<&str>)`**: Removes specified columns from the CSV file.
 //! - **`.rename_columns(rename_map: Vec<(&str, &str)>)`**: Renames columns as specified.
-//! - **`.where_(column: &str, operator: &str, value: &str, comparison_type: &str)`**: Filters rows based on a condition.
+//! - **`.where_(column: &str, operator: &str, value: T, comparison_type: &str)`**: Filters rows based on a condition, supporting text, numeric, and timestamp comparisons. The value parameter accepts any type T that implements the CompareValue trait, allowing for flexible comparisons.
 //!
 //! ## License
 //!
