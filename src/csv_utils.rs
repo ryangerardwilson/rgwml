@@ -20,15 +20,13 @@ use std::time::{Duration, SystemTime};
 pub struct CsvConverter;
 
 impl CsvConverter {
+    /// Handles conversions to csv from json
     pub fn from_json(json_data: &str, file_path: &str) -> Result<(), Box<dyn Error>> {
-        /// Parses the JSON string into serde_json::Value
         let data: Value = serde_json::from_str(json_data)?;
 
-        /// Initializes a writer to write to the specified file
         let file = File::create(file_path)?;
         let mut wtr = Writer::from_writer(file);
 
-        /// Checks if the top-level JSON structure is an array
         if let Value::Array(items) = data {
             // Process only if there are items in the array
             if let Some(first_item) = items.first() {
