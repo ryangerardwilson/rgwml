@@ -4,6 +4,11 @@
 //! This library simplifies Data Science, Machine Learning, and Artifical Intelligence operations. It's designed to leverage the best features of RUST, in a manner that is graceful, elegant, and ticklishly fun to build upon.
 //!
 //! ## Modules Overview
+//!
+//! ### `csv_utils`
+//! - **Purpose**: Gracefully build csv files.
+//! - **Features**: The CsvBuilder struct allows you to create CSV files with grace by chaining easy-to-read methods to set headers and add rows.
+//!
 //! ### `df_utils`
 //! - **Purpose**: Replicate Python Pandas library and Jypiter Notebook functionality in Rust.
 //! - **Features**: The Query and Grouper structs ease data manipulation, transformation, filtering, sorting, and aggregation, as DataFrames. The DataFrameCacher struct allows you to gracefully cache and retrieve results of functions that return a Dataframe.
@@ -16,15 +21,135 @@
 //! - **Purpose**: Gracefully make and cache API calls.
 //! - **Features**: The ApiCallBuilder struct allows you to make, cache API calls, and also manage the subsequent cached usage.
 //!
-//! ### `csv_utils`
-//! - **Purpose**: Gracefully build csv files.
-//! - **Features**: The CsvBuilder struct allows you to create CSV files with grace by chaining easy-to-read methods to set headers and add rows.
+//! ## csv_utils
 //!
-//! ## Examples
+//! This module features the CsvBuilder, a fluent interface for creating, analyzing, and saving CSV files. This module simplifies interactions with CSV data, allowing for a range of operations such as creating new files, modifying existing files, or working with DataFrame structures.
 //!
-//! ### df_utils
+//! ### CsvBuilder
 //!
-//! #### DataFrame
+//! #### Instantiation
+//!
+//! Example 1: Creating a New CsvBuilder Object
+//! ```
+//! use rgwml::csv_utils::CsvBuilder;
+//!
+//! let builder = CsvBuilder::new()
+//!     .set_header(&["Column1", "Column2", "Column3"])
+//!     .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
+//!     .save_as("/path/to/your/file.csv");
+//! ```
+//!
+//! Example 2: Loading from an Existing File
+//! ```
+//! use rgwml::csv_utils::CsvBuilder;
+//!
+//! let builder = CsvBuilder::from_csv("/path/to/existing/file.csv");
+//! ```
+//!
+//! Example 3: Loading from a DataFrame Object
+//! ```
+//! use rgwml::csv_utils::CsvBuilder;
+//! use rgwml::df_utils::DataFrame;
+//!
+//! let data_frame = // Initialize your DataFrame here
+//! let builder = CsvBuilder::from_dataframe(data_frame)
+//!     .set_header(&["Column1", "Column2", "Column3"])
+//!     .save_as("/path/to/your/file.csv");
+//! ```
+//!
+//! #### Manipulating a CsvBuilder Object for Analysis or Saving
+//!
+//! ```
+//! use rgwml::csv_utils::CsvBuilder;
+//!
+//! let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
+//!     .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
+//!     .drop_columns(vec!["UNUSED_COLUMN"])
+//!     .cascade_sort(vec![("COLUMN", "ASC")])
+//!     .where_("address","FUZZ_MIN_SCORE_70",vec!["new delhi","jerusalem"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
+//!     .print_row_count()
+//!     .save_as("/path/to/modified/file.csv");
+//! ```
+//!
+//! #### Discovering Chainable Options
+//!
+//! ```
+//! let builder = CsvBuilder::new()
+//!     .get_options(); // Outputs available options and their syntax
+//! ```
+//!
+//! Chainable Options in `CsvBuilder`
+//!
+//! - **`.save_as(path: &str)`**: Saves the current state of the CSV to a specified file path.
+//! - **`.set_header(columns: &[&str])`**: Sets the header (column names) of the CSV file.
+//! - **`.add_row(row: &[&str])`**: Adds a single row to the CSV file.
+//! - **`.add_rows(rows: &[&[&str]])`**: Adds multiple rows to the CSV file.
+//! - **`.order_columns(order: Vec<&str>)`**: Orders columns in the specified sequence.
+//! - **`.print_columns()`**: Prints the names of the columns in the CSV file.
+//! - **`.print_row_count()`**: Prints the total number of rows in the CSV file.
+//! - **`.print_first_row()`**: Prints the first row of the CSV file in a JSON-like format.
+//! - **`.print_last_row()`**: Prints the last row of the CSV file in a JSON-like format.
+//! - **`.print_rows_range(start: usize, end: usize)`**: Prints a range of rows.
+//! - **`.print_rows()`**: Prints all rows in the CSV file.
+//! - **`.cascade_sort(sort_order: Vec<(&str, &str)>)`**: Sorts the data in the CSV file.
+//! - **`.drop_columns(columns: Vec<&str>)`**: Removes specified columns from the CSV file.
+//! - **`.rename_columns(rename_map: Vec<(&str, &str)>)`**: Renames columns as specified.
+//! - **`.where_(column: &str, operator: &str, value: T, comparison_type: &str)`**: Filters rows based on a condition, supporting text, numeric, and timestamp comparisons. The value parameter accepts any type T that implements the CompareValue trait, allowing for flexible comparisons.
+//! - **`.limit(limit: usize)`**: Limits the number of rows to be included in the CSV file. If the current number of rows exceeds this limit, the excess rows are truncated.
+//!
+//! ### CsvResultCacher
+//!
+//! CsvResultCacher in rgwml::csv_utils is a tool for caching CSV data. It uses a data generator function to create or fetch data, saves it to a specified path, and keeps it for a set duration. This helps avoid unnecessary data regeneration. Imagine you have a CSV file that logs daily temperatures. You don't want to generate this file every time you access it, especially if the data doesn't change much during the day. Here's how you can use CsvResultCacher:
+//!     
+//!     use rgwml::api_utils::ApiCallBuilder;
+//!     use rgwml::csv_utils::{CsvBuilder, CsvResultCacher};
+//!     use serde_json::json;
+//!     use tokio;
+//!
+//!     async fn generate_daily_sales_report() -> Result<(), Box<dyn std::error::Error>> {
+//!         async fn fetch_sales_data_from_api() -> Result<String, Box<dyn std::error::Error>> {
+//!             let method = "POST";
+//!             let url = "http://example.com/api/sales"; // API URL to fetch sales data
+//!             let payload = json!({
+//!                 "date": "2023-12-21"
+//!                 });
+//!             let response = ApiCallBuilder::call(method, url, None, Some(payload))
+//!             .execute()
+//!             .await?;
+//!         Ok(response)
+//!         }
+//!
+//!         let sales_data_response = fetch_sales_data_from_api().await?;
+//!
+//!         // Convert the JSON response to CSV format using CsvBuilder
+//!         let csv_builder = CsvBuilder::from_api_call(sales_data_response)
+//!         .await
+//!         .unwrap()
+//!         .save_as("/path/to/daily_sales_report.csv");
+//!
+//!         Ok(())
+//!     }
+//!
+//!     #[tokio::main]
+//!     async fn main() {
+//!         let cache_path = "/path/to/daily_sales_report.csv";
+//!         let cache_duration_minutes = 1440; // Cache duration set to 1 day
+//!
+//!         let result = CsvResultCacher::fetch_async(
+//!             || Box::pin(generate_daily_sales_report()),
+//!             cache_path,
+//!             cache_duration_minutes,
+//!             ).await;
+//!
+//!         match result {
+//!             Ok(_) => println!("Sales report is ready."),
+//!             Err(e) => eprintln!("Failed to generate sales report: {}", e),
+//!         }
+//!     }
+//!
+//! ## df_utils
+//!
+//! ### DataFrame
 //!
 //! A `DataFrame` is a collection of data organized into a tabular structure, where each row is represented as a `HashMap`.
 //!
@@ -40,7 +165,7 @@
 //!     let data_frame = vec![row];
 //! ```
 //!
-//! #### fn data_frame_to_value_array()
+//! ### fn data_frame_to_value_array()
 //!
 //! Converts a DataFrame into a serde_json Value::Array. This function takes a DataFrame as input and converts it into a Value::Array, where each element is a Value::Object constructed from the HashMap entries.
 //!
@@ -50,7 +175,7 @@
 //!     let value_array = data_frame_to_value_array(df);
 //! ```
 //!
-//! #### fn dataframe_to_csv()
+//! ### fn dataframe_to_csv()
 //!
 //! Writes a DataFrame to a CSV file at the specified path.
 //!
@@ -63,7 +188,7 @@
 //!     dataframe_to_csv(df, "path/to/file.csv").expect("Failed to write CSV");
 //! ```
 //!
-//! #### Query
+//! ### Query
 //!
 //! `Query` struct provides a fluent interface for querying and manipulating data within a `DataFrame`.
 //!
@@ -114,7 +239,7 @@
 //! Note: This example assumes the existence of a `DataFrame` type and relevant methods.
 //! Replace placeholder code with actual implementations as per your project's context.
 //!
-//! #### Grouper
+//! ### Grouper
 //!
 //! A utility for grouping rows in a DataFrame based on a specified key.
 //!
@@ -138,7 +263,7 @@
 //! // `grouped_dfs` will now contain two grouped DataFrames, one for each category (`Fruit` and `Vegetable`).
 //! ```
 //!
-//! #### DataFrameCacher
+//! ### DataFrameCacher
 //!
 //! A utility designed for caching and retrieving data stored in a structured format known as `DataFrame`. It shines in scenarios where data generation can be time-consuming, such as fetching data from external sources or performing resource-intensive computations.
 //!
@@ -186,7 +311,7 @@
 //! environment, so by using `|| Box`, you ensure that both the closure and the function it
 //! captures can be moved into `DataFrameCacher`, satisfying the necessary lifetime constraints.
 //!
-//! #### ai_utils
+//! ## ai_utils
 //!
 //! Provides simple AI utilities for neural association analysis. It offers tools to process and analyze data in the context of neural networks, with a focus on understanding decision-making processes and text analysis in a parallel computing environment.
 //!
@@ -242,7 +367,7 @@
 //!
 //! This integrated example demonstrates the full process of data transformation and analysis, highlighting the capabilities of the `rgwml` library in neural association studies. This library is perfect for applications where AI's interpretation of data patterns and decision-making processes are crucial.
 //!
-//! ### api_utils
+//! ## api_utils
 //!
 //! This module features the APICallBuilder a fluent interface to build API requests with support for method chaining. It simplifies the process by allowing you to specify both headers and payload as `serde_json::Value`. This approach is convenient when dealing with JSON data, making it easy to construct requests dynamically. If caching is enabled, responses are stored and reused for subsequent requests made within the specified cache duration.
 //!
@@ -341,79 +466,6 @@
 //! These examples demonstrate how to use the ApiCallBuilder with and without custom headers. Since the headers and payload are specified as `serde_json::Value`, it offers flexibility in constructing various types of requests.
 //!
 //! Note: Be cautious when caching POST requests, as they typically send unique data each time. Caching is most effective when the same request is likely to yield the same response.
-//!
-//! ### csv_utils
-//!
-//! This module features the CsvBuilder, a fluent interface for creating, analyzing, and saving CSV files. This module simplifies interactions with CSV data, allowing for a range of operations such as creating new files, modifying existing files, or working with DataFrame structures.
-//!
-//! #### Instantiating a CsvBuilder Object
-//!
-//! Example 1: Creating a New Object
-//! ```
-//! use rgwml::csv_utils::CsvBuilder;
-//!
-//! let builder = CsvBuilder::new()
-//!     .set_header(&["Column1", "Column2", "Column3"])
-//!     .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
-//!     .save_as("/path/to/your/file.csv");
-//! ```
-//!
-//! Example 2: Loading from an Existing File
-//! ```
-//! use rgwml::csv_utils::CsvBuilder;
-//!
-//! let builder = CsvBuilder::from_csv("/path/to/existing/file.csv");
-//! ```
-//!
-//! Example 3: Loading from a DataFrame Object
-//! ```
-//! use rgwml::csv_utils::CsvBuilder;
-//! use rgwml::df_utils::DataFrame;
-//!
-//! let data_frame = // Initialize your DataFrame here
-//! let builder = CsvBuilder::from_dataframe(data_frame)
-//!     .set_header(&["Column1", "Column2", "Column3"])
-//!     .save_as("/path/to/your/file.csv");
-//! ```
-//!
-//! #### Manipulating a CsvBuilder Object for Analysis or Saving
-//!
-//! ```
-//! use rgwml::csv_utils::CsvBuilder;
-//!
-//! let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
-//!     .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
-//!     .drop_columns(vec!["UNUSED_COLUMN"])
-//!     .cascade_sort(vec![("COLUMN", "ASC")])
-//!     .where_("address","FUZZ_MIN_SCORE_70",vec!["new delhi","jerusalem"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
-//!     .print_row_count()
-//!     .save_as("/path/to/modified/file.csv");
-//! ```
-//!
-//! #### Discovering Chainable Options
-//!
-//! ```
-//! let builder = CsvBuilder::new()
-//!     .get_options(); // Outputs available options and their syntax
-//! ```
-//!
-//! Chainable Options in `CsvBuilder`
-//!
-//! - **`.save_as(path: &str)`**: Saves the current state of the CSV to a specified file path.
-//! - **`.set_header(columns: &[&str])`**: Sets the header (column names) of the CSV file.
-//! - **`.add_row(row: &[&str])`**: Adds a single row to the CSV file.
-//! - **`.add_rows(rows: &[&[&str]])`**: Adds multiple rows to the CSV file.
-//! - **`.order_columns(order: Vec<&str>)`**: Orders columns in the specified sequence.
-//! - **`.print_columns()`**: Prints the names of the columns in the CSV file.
-//! - **`.print_row_count()`**: Prints the total number of rows in the CSV file.
-//! - **`.print_first_row()`**: Prints the first row of the CSV file in a JSON-like format.
-//! - **`.print_last_row()`**: Prints the last row of the CSV file in a JSON-like format.
-//! - **`.print_rows_range(start: usize, end: usize)`**: Prints a range of rows.
-//! - **`.print_rows()`**: Prints all rows in the CSV file.
-//! - **`.cascade_sort(sort_order: Vec<(&str, &str)>)`**: Sorts the data in the CSV file.
-//! - **`.drop_columns(columns: Vec<&str>)`**: Removes specified columns from the CSV file.
-//! - **`.rename_columns(rename_map: Vec<(&str, &str)>)`**: Renames columns as specified.
-//! - **`.where_(column: &str, operator: &str, value: T, comparison_type: &str)`**: Filters rows based on a condition, supporting text, numeric, and timestamp comparisons. The value parameter accepts any type T that implements the CompareValue trait, allowing for flexible comparisons.
 //!
 //! ## License
 //!

@@ -1,15 +1,20 @@
 // csv_utils.rs
 use crate::df_utils::DataFrame;
+use crate::api_utils::ApiCallBuilder;
 use chrono::{DateTime, NaiveDateTime};
 use csv::Writer;
 use futures::executor::block_on;
 use futures::future::join_all;
+use futures::Future;
 use fuzzywuzzy::fuzz;
+use regex::Regex;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
+use std::fs;
 use std::fs::File;
-use regex::Regex;
+use std::pin::Pin;
+use std::time::{Duration, SystemTime};
 
 /// Defines the trait for comparison values
 pub trait CompareValue {
@@ -20,7 +25,7 @@ pub trait CompareValue {
 impl CompareValue for &str {
     fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool {
         // Simplified example, implement the logic as per your requirement
-                match compare_as {
+        match compare_as {
             "COMPARE_AS_TEXT" => match operation {
                 "==" => cell_value == *self,
                 "CONTAINS" => cell_value.contains(*self),
@@ -28,18 +33,16 @@ impl CompareValue for &str {
                 _ => false,
             },
 
-"COMPARE_AS_NUMBERS" => {
-                match (cell_value.parse::<f64>(), self.parse::<f64>()) {
-                    (Ok(n1), Ok(n2)) => match operation {
-                        "==" => n1 == n2,
-                        ">" => n1 > n2,
-                        "<" => n1 < n2,
-                        _ => false,
-                    },
-                    _ => {
-                        println!("Failed to parse as numbers: '{}' or '{}'", cell_value, self);
-                        false
-                    }
+            "COMPARE_AS_NUMBERS" => match (cell_value.parse::<f64>(), self.parse::<f64>()) {
+                (Ok(n1), Ok(n2)) => match operation {
+                    "==" => n1 == n2,
+                    ">" => n1 > n2,
+                    "<" => n1 < n2,
+                    _ => false,
+                },
+                _ => {
+                    println!("Failed to parse as numbers: '{}' or '{}'", cell_value, self);
+                    false
                 }
             },
 
@@ -59,9 +62,9 @@ impl CompareValue for &str {
                         false
                     }
                 }
-            },
-                    _ => false,
-                }
+            }
+            _ => false,
+        }
     }
 }
 
@@ -70,17 +73,21 @@ impl CompareValue for Vec<&str> {
     fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool {
         if operation.starts_with("FUZZ_MIN_SCORE_") && compare_as == "COMPARE_AS_TEXT" {
             // Extract the score threshold from the operation string
-            let score_threshold: i32 = operation["FUZZ_SCORE_".len()..].parse().unwrap_or(70);
+            let score_threshold: i32 = operation["FUZZ_MIN_SCORE_".len()..].parse().unwrap_or(70);
 
             // dbg!(&score_threshold);
 
-                        let re = Regex::new(r"[^a-zA-Z\s]").unwrap();
+            let re = Regex::new(r"[^a-zA-Z\s]").unwrap();
 
             // Replace non-alphabet characters with nothing (effectively removing them)
             let only_alpha = re.replace_all(cell_value, "");
 
             // Trim, split on whitespace, and join to ensure single spaces between words
-            let cleaned_cell_value = only_alpha.trim().split_whitespace().collect::<Vec<&str>>().join(" ");
+            let cleaned_cell_value = only_alpha
+                .trim()
+                .split_whitespace()
+                .collect::<Vec<&str>>()
+                .join(" ");
             let words: Vec<&str> = cleaned_cell_value.split_whitespace().collect();
             let mut all_scores = vec![];
 
@@ -92,16 +99,13 @@ impl CompareValue for Vec<&str> {
                     for combination in words.windows(len) {
                         let combined = combination.join(" ");
                         let value_clone = value.to_string();
-                        futures.push(async move {
-                            fuzz::ratio(&combined, &value_clone)
-                        });
+                        futures.push(async move { fuzz::ratio(&combined, &value_clone) });
                     }
                 }
 
                 let scores = block_on(join_all(futures));
                 all_scores.extend(scores);
             }
-
 
             let max_score = *all_scores.iter().max().unwrap_or(&0);
             i32::from(max_score) >= score_threshold
@@ -111,8 +115,6 @@ impl CompareValue for Vec<&str> {
     }
 }
 
-
-
 /// A flexible builder for creating and writing to CSV files.
 ///
 /// This struct allows for a fluent interface to build and write to a CSV file,
@@ -121,12 +123,13 @@ impl CompareValue for Vec<&str> {
 pub struct CsvBuilder {
     headers: Vec<String>,
     data: Vec<Vec<String>>,
+    limit: Option<usize>,
     error: Option<Box<dyn Error>>,
 }
 
 impl CsvBuilder {
     /// A function to get available options and their syntax
-    pub fn get_options(&self) {
+    pub fn get_options(&mut self) -> &mut Self {
         let mut options = [
             ".save_as('/path/to/your/file.csv')",
             ".set_header(&['Column1', 'Column2', 'Column3']) // Only on CsvBuilder::new() instantiations",
@@ -150,6 +153,7 @@ impl CsvBuilder {
             ".where_('column1', 'STARTS_WITH', 'discounted', 'COMPARE_AS_TEXT')",
             ".where_('stated_locality_address','FUZZ_MIN_SCORE_90',vec!['Shastri park','kamal nagar'], 'COMPARE_AS_TEXT') // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.",
             ".where_('column1', '>', '23-01-01', 'COMPARE_AS_TIMESTAMPS')",
+            ".limit(10)"
         ];
         options.sort();
 
@@ -157,14 +161,13 @@ impl CsvBuilder {
         println!("Available CsvBuilder chain options:");
         println!();
 
-            for option in &options {
-        let option_with_double_quotes = option.replace("'", "\"");
-        println!("  - {}", option_with_double_quotes);
-    }
-            /*
         for option in &options {
-            println!("  - {}", option);
-        }*/
+            let option_with_double_quotes = option.replace("'", "\"");
+            println!("  - {}", option_with_double_quotes);
+        }
+
+        self
+
     }
 
     /// Creates a new `CsvBuilder` instance with empty headers and data.
@@ -182,6 +185,7 @@ impl CsvBuilder {
         CsvBuilder {
             headers: Vec::new(),
             data: Vec::new(),
+            limit: None,
             error: None,
         }
     }
@@ -229,6 +233,59 @@ impl CsvBuilder {
 
         builder
     }
+
+
+    /// Creates a `CsvBuilder` from the response of an `ApiCallBuilder`.
+    ///
+    /// ```
+    /// use rgwml::csv_utils::CsvBuilder;
+    /// use rgwml::api_utils::ApiCallBuilder;
+    ///
+    /// let api_call_builder = ApiCallBuilder::call("GET", "http://example.com/api/data", None, None);
+    /// let builder = CsvBuilder::from_api_builder_object(api_call_builder).await?;
+    /// ```
+    /// Creates a `CsvBuilder` from an API response.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rgwml::csv_utils::CsvBuilder;
+    /// use rgwml::api_utils::ApiCallBuilder;
+    ///
+    /// let api_response = ApiCallBuilder::call("GET", "http://example.com/api/data", None, None)
+    ///     .execute()
+    ///     .await
+    ///     .unwrap();
+    /// let builder = CsvBuilder::from_api_response(api_response).await?;
+    /// ```
+    pub async fn from_api_call(api_response: String) -> Result<Self, Box<dyn std::error::Error>> {
+        // Parse the response into CSV format. This depends on the format of your API response.
+        let json_value: serde_json::Value = serde_json::from_str(&api_response)?;
+        let mut builder = CsvBuilder::new();
+
+        // Assuming the JSON is an array of objects
+        if let Some(array) = json_value.as_array() {
+            // Set headers if there are any records
+            if let Some(first_record) = array.first() {
+                if let serde_json::Value::Object(obj) = first_record {
+                    builder.headers = obj.keys().cloned().collect();
+                }
+            }
+
+            // Set data rows
+            for item in array {
+                if let serde_json::Value::Object(obj) = item {
+                    let row: Vec<String> = builder.headers.iter().map(|h| {
+                        obj.get(h).map_or("".to_string(), |v| v.to_string())
+                    }).collect();
+                    builder.data.push(row);
+                }
+            }
+        }
+
+        Ok(builder)
+    }
+
 
     /// Creates a `CsvBuilder` from a DataFrame, extracting headers and data.
     ///
@@ -557,13 +614,16 @@ impl CsvBuilder {
         if let Some(column_index) = self.headers.iter().position(|h| h == column_name) {
             let original_data = std::mem::replace(&mut self.data, Vec::new());
 
-            let filtered_data = original_data.into_iter().filter(|row| {
-                if let Some(cell_value) = row.get(column_index) {
-                    value.apply(cell_value, operation, compare_as)
-                } else {
-                    false
-                }
-            }).collect();
+            let filtered_data = original_data
+                .into_iter()
+                .filter(|row| {
+                    if let Some(cell_value) = row.get(column_index) {
+                        value.apply(cell_value, operation, compare_as)
+                    } else {
+                        false
+                    }
+                })
+                .collect();
 
             self.data = filtered_data;
         } else {
@@ -571,7 +631,6 @@ impl CsvBuilder {
         }
         self
     }
-
 
     /// Helper function to parse timestamps
     fn parse_timestamp(time_str: &str) -> Result<NaiveDateTime, String> {
@@ -603,7 +662,81 @@ impl CsvBuilder {
             None => Err(format!("Unable to parse '{}' as a timestamp", time_str)),
         }
     }
+
+    /// Sets a limit on the number of rows to be included in the CSV and truncates the data if it exceeds the limit.
+    pub fn limit(&mut self, limit: usize) -> &mut Self {
+        self.limit = Some(limit);
+
+        // Truncate the data vector if it exceeds the limit
+        if self.data.len() > limit {
+            self.data.truncate(limit);
+        }
+
+        self
+    }
 }
 
+/// Represents a caching mechanism for CSV results, holding a data generator, cache path, and cache duration.
+pub struct CsvResultCacher {
+    data_generator: Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>>>> + Send + Sync>,
+    cache_path: String, // Still using String here to store the path
+    cache_duration: Duration,
+}
 
+impl CsvResultCacher {
 
+    /// Constructs a new `CsvResultCacher` with a specified data generator, cache path, and cache duration in minutes.
+    pub fn new<F>(data_generator: F, cache_path: String, cache_duration_minutes: u64) -> Self
+    where
+        F: Fn() -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>>>> + Send + Sync + 'static,
+    {
+        CsvResultCacher {
+            data_generator: Box::new(data_generator),
+            cache_path,
+            cache_duration: Duration::from_secs(cache_duration_minutes * 60),
+        }
+    }
+
+    /// Asynchronously fetches CSV data using a given generator, cache path, and cache duration, and initializes the cacher.
+    pub async fn fetch_async<F>(
+        data_generator: F,
+        cache_path: &str,
+        cache_duration_minutes: u64,
+    ) -> Result<(), Box<dyn Error>>
+    where
+        F: Fn() -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>>>> + Send + Sync + 'static,
+    {
+        let cacher = CsvResultCacher::new(
+            data_generator, 
+            cache_path.to_string(), // Convert &str to String here
+            cache_duration_minutes,
+        );
+        cacher.fetch_data().await
+    }
+
+    /// Checks if the cached data is still valid based on the current time and the cache duration.
+    fn is_cache_valid(&self) -> bool {
+        if let Ok(metadata) = fs::metadata(&self.cache_path) {
+            if let Ok(modified) = metadata.modified() {
+                return SystemTime::now()
+                    .duration_since(modified)
+                    .map(|duration| duration < self.cache_duration)
+                    .unwrap_or(false);
+            }
+        }
+        false
+    }
+
+    /// Asynchronously fetches data, using cached data if valid, or generating new data otherwise.
+    pub async fn fetch_data(&self) -> Result<(), Box<dyn Error>> {
+        if self.is_cache_valid() {
+            println!("Using cached CSV file at {}", &self.cache_path);
+            // Optionally, add logic to read and process the cached CSV file
+        } else {
+            println!("Generating new CSV file.");
+            (self.data_generator)().await?;
+            // Implement logic to save the generated data to self.cache_path
+        }
+        Ok(())
+    }
+}
