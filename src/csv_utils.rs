@@ -2,6 +2,7 @@
 use crate::df_utils::DataFrame;
 use chrono::{DateTime, NaiveDateTime};
 use csv::Writer;
+use serde_json::Value;
 use futures::executor::block_on;
 use futures::future::join_all;
 use futures::Future;
@@ -14,6 +15,43 @@ use std::fs;
 use std::fs::File;
 use std::pin::Pin;
 use std::time::{Duration, SystemTime};
+
+/// A utility struct for converting JSON data to CSV format.
+pub struct CsvConverter;
+
+impl CsvConverter {
+    pub fn from_json(json_data: &str, file_path: &str) -> Result<(), Box<dyn Error>> {
+        /// Parses the JSON string into serde_json::Value
+        let data: Value = serde_json::from_str(json_data)?;
+
+        /// Initializes a writer to write to the specified file
+        let file = File::create(file_path)?;
+        let mut wtr = Writer::from_writer(file);
+
+        /// Checks if the top-level JSON structure is an array
+        if let Value::Array(items) = data {
+            // Process only if there are items in the array
+            if let Some(first_item) = items.first() {
+                if let Value::Object(map) = first_item {
+                    // Write the headers (keys of the first item)
+                    wtr.write_record(map.keys())?;
+                }
+
+                // Write the rest of the data
+                for item in items {
+                    if let Value::Object(map) = item {
+                        let row: Vec<String> = map.values().map(|v| v.to_string()).collect();
+                        wtr.write_record(&row)?;
+                    }
+                }
+            }
+        }
+
+        // Flush and finish writing to the file
+        wtr.flush()?;
+        Ok(())
+    }
+}
 
 /// Defines the trait for comparison values
 pub trait CompareValue {
@@ -232,59 +270,6 @@ impl CsvBuilder {
 
         builder
     }
-
-
-    /// Creates a `CsvBuilder` from the response of an `ApiCallBuilder`.
-    ///
-    /// ```
-    /// use rgwml::csv_utils::CsvBuilder;
-    /// use rgwml::api_utils::ApiCallBuilder;
-    ///
-    /// let api_call_builder = ApiCallBuilder::call("GET", "http://example.com/api/data", None, None);
-    /// let builder = CsvBuilder::from_api_builder_object(api_call_builder).await?;
-    /// ```
-    /// Creates a `CsvBuilder` from an API response.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rgwml::csv_utils::CsvBuilder;
-    /// use rgwml::api_utils::ApiCallBuilder;
-    ///
-    /// let api_response = ApiCallBuilder::call("GET", "http://example.com/api/data", None, None)
-    ///     .execute()
-    ///     .await
-    ///     .unwrap();
-    /// let builder = CsvBuilder::from_api_response(api_response).await?;
-    /// ```
-    pub async fn from_api_call(api_response: String) -> Result<Self, Box<dyn std::error::Error>> {
-        // Parse the response into CSV format. This depends on the format of your API response.
-        let json_value: serde_json::Value = serde_json::from_str(&api_response)?;
-        let mut builder = CsvBuilder::new();
-
-        // Assuming the JSON is an array of objects
-        if let Some(array) = json_value.as_array() {
-            // Set headers if there are any records
-            if let Some(first_record) = array.first() {
-                if let serde_json::Value::Object(obj) = first_record {
-                    builder.headers = obj.keys().cloned().collect();
-                }
-            }
-
-            // Set data rows
-            for item in array {
-                if let serde_json::Value::Object(obj) = item {
-                    let row: Vec<String> = builder.headers.iter().map(|h| {
-                        obj.get(h).map_or("".to_string(), |v| v.to_string())
-                    }).collect();
-                    builder.data.push(row);
-                }
-            }
-        }
-
-        Ok(builder)
-    }
-
 
     /// Creates a `CsvBuilder` from a DataFrame, extracting headers and data.
     ///

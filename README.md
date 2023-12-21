@@ -10,7 +10,7 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 ### `csv_utils`
 
 - **Purpose**: Gracefully build csv files.
-- **Features**: The CsvBuilder struct allows you to create CSV files with grace by chaining easy-to-read methods to set headers and add rows.
+- **Features**: The CsvBuilder allows you to create CSV files with grace by chaining easy-to-read methods to set headers and add rows, where as the CsvResultCacher :.
 
 ### `df_utils`
 
@@ -45,7 +45,7 @@ Example 1: Creating a new object
         .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
         .save_as("/path/to/your/file.csv");
 
-Example 2: Loadfrom an existing file
+Example 2: Load from an existing file
 
     use rgwml::csv_utils::CsvBuilder;
 
@@ -58,7 +58,6 @@ Example 3: Load from a DataFrame object
 
     let data_frame = // Initialize your DataFrame here
     let builder = CsvBuilder::from_dataframe(data_frame)
-        .set_header(&["Column1", "Column2", "Column3"])
         .save_as("/path/to/your/file.csv"); 
 
 #### Manipulating a CsvBuilder Object for Analysis or Saving
@@ -111,6 +110,37 @@ Chainable Options in `CsvBuilder`
 - **`.where_(column: &str, operator: &str, value: T, comparison_type: &str)`**: Filters rows based on a condition, supporting text, numeric, and timestamp comparisons. The value parameter accepts any type T that implements the CompareValue trait, allowing for flexible comparisons.
 
 - **`.limit(limit: usize)`**: Limits the number of rows to be included in the CSV file. If the current number of rows exceeds this limit, the excess rows are truncated.
+
+### CsvConverter
+
+The `CsvConverter` struct in the `rgwml::csv_utils` module provides a method for converting JSON data into CSV format. This utility is particularly useful for processing and saving JSON API responses as CSV files, offering a straightforward approach to data conversion. The `CsvConverter` simplifies the process of converting JSON data into a CSV format. This is particularly useful for scenarios where data is received in JSON format from an API and needs to be transformed into a more accessible and readable CSV file. To use `CsvConverter`, simply call the `from_json` method with the JSON data and the desired output file path as arguments.
+
+Example:
+
+    use tokio;
+    use rgwml::csv_utils::CsvConverter;
+
+    async fn fetch_sales_data_from_api() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
+        let url = "http://example.com/api/sales"; // API URL to fetch sales data
+
+        let payload = json!({
+            "date": "2023-12-21"
+        });
+
+        let response = ApiCallBuilder::call(method, url, None, Some(payload))
+            .execute()
+            .await?;
+
+        Ok(response)
+    }
+
+    #[tokio::main]
+    async fn main() {
+        let sales_data_response = fetch_sales_data_from_api().await?;
+        CsvConverter::from_json(sales_data_response, "path/to/your/file.csv")
+            .expect("Failed to convert JSON to CSV");
+    }
 
 ### CsvResultCacher
 
