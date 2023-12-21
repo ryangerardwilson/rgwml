@@ -7,6 +7,11 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 1. Overview
 -------------------
 
+### `csv_utils`
+
+- **Purpose**: Gracefully build csv files.
+- **Features**: The CsvBuilder struct allows you to create CSV files with grace by chaining easy-to-read methods to set headers and add rows.
+
 ### `df_utils`
 
 - **Purpose**: Replicate Python Pandas library and Jypiter Notebook functionality in Rust.
@@ -21,11 +26,6 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 
 - **Purpose**: Gracefully make and cache API calls.
 - **Features**: The ApiCallBuilder struct allows you to make, cache API calls, and also manage the subsequent cached usage.
-
-### `csv_utils`
-
-- **Purpose**: Gracefully build csv files.
-- **Features**: The CsvBuilder struct allows you to create CSV files with grace by chaining easy-to-read methods to set headers and add rows.
 
 2. csv_utils
 ------------
