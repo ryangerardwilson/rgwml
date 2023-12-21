@@ -96,7 +96,7 @@ use std::str::FromStr;
 ///     });
 ///     let response = ApiCallBuilder::call(
 ///             method,            
-///             url, 
+///             url,
 ///             Some(headers),
 ///             Some(payload) // Payload as form data
 ///         )

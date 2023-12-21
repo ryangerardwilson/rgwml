@@ -1,5 +1,6 @@
 // csv_utils.rs
 use crate::df_utils::DataFrame;
+use chrono::{DateTime, Local, NaiveDateTime, ParseError};
 use csv::Writer;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -18,6 +19,40 @@ pub struct CsvBuilder {
 }
 
 impl CsvBuilder {
+    /// A function to get available options and their syntax
+    pub fn get_options(&self) {
+        let mut options = [
+            ".save_as('/path/to/your/file.csv')",
+            ".set_header(&['Column1', 'Column2', 'Column3']) // Only on CsvBuilder::new() instantiations",
+            ".add_row(&['Row1-1', 'Row1-2', 'Row1-3'])", 
+            ".add_rows(&[&['Row1-1', 'Row1-2', 'Row1-3'], &['Row2-1', 'Row2-2', 'Row2-3']])",
+            ".order_columns(vec!['Column1', '...', 'Column5', 'Column2'])",
+            ".order_columns(vec!['...', 'Column5', 'Column2'])",
+            ".order_columns(vec!['Column1', 'Column5', '...'])",
+            ".print_columns()",
+            ".print_row_count()",
+            ".print_first_row()",
+            ".print_last_row()",
+            ".print_rows_range(2,5)",
+            ".print_rows()",
+            ".cascade_sort(vec![('Column1', 'DESC'), ('Column3', 'ASC')])",
+            ".drop_columns(vec!['Column1', 'Column3'])",
+            ".rename_columns(vec![('Column1', 'NewColumn1'), ('Column3', 'NewColumn3')])",
+            ".where_('column1', '==', '42', 'compare as numbers')",
+            ".where_('column1', '==', 'hello', 'compare as text')",
+            ".where_('column1', 'contains', 'apples', 'compare as text')",
+            ".where_('column1', '>', '23-01-01', 'compare as timestamps')",
+        ];
+        options.sort();
+
+        println!();
+        println!("Available CsvBuilder chain options:");
+        println!();
+        for option in &options {
+            println!("  - {}", option);
+        }
+    }
+
     /// Creates a new `CsvBuilder` instance with empty headers and data.
     ///
     /// # Example
@@ -118,23 +153,7 @@ impl CsvBuilder {
     }
 
     /// Saves data in the `CsvBuilder` to a new CSV file at `new_file_path`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use rgwml::csv_utils::CsvBuilder;
-    /// use rgwml::df_utils::DataFrame; // Replace with actual DataFrame type
-    ///
-    /// let data_frame = // Your DataFrame initialization here
-    /// CsvBuilder::from_dataframe(data_frame)
-    ///     .add_row(&["Row1-1", "Row1-2", "Row1-3"])
-    ///     .add_rows(&[&["Row2-1", "Row2-2", "Row2-3"], &["Row3-1", "Row3-2", "Row3-3"]])
-    ///     .save_as("/path/to/your/file.csv");
-    /// ```
-    ///
-    /// Creates a `CsvBuilder` from a DataFrame, adds rows, and saves the data as a new CSV file.
-
-    pub fn save_as(&self, new_file_path: &str) -> Result<(), Box<dyn Error>> {
+    pub fn save_as(&mut self, new_file_path: &str) -> Result<(), Box<dyn Error>> {
         match File::create(new_file_path) {
             Ok(file) => {
                 let mut wtr = Writer::from_writer(file);
@@ -152,20 +171,6 @@ impl CsvBuilder {
     }
 
     /// Sets the CSV header using an array of strings.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use rgwml::csv_utils::CsvBuilder;
-    ///
-    /// let builder = CsvBuilder::new()
-    ///     .set_header(&["Column1", "Column2", "Column3"])
-    ///     .add_row(&["Row1-1", "Row1-2", "Row1-3"])
-    ///     .save_as("/path/to/your/file.csv");
-    /// ```
-    ///
-    /// Creates a `CsvBuilder` with the specified header, adds a data row, and then
-    /// saves the data as a new CSV file.    
     pub fn set_header(mut self, header: &[&str]) -> Self {
         if self.error.is_none() {
             let header_row = header.iter().map(|s| s.to_string()).collect();
@@ -175,20 +180,6 @@ impl CsvBuilder {
     }
 
     /// Adds a data row to the CSV.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use rgwml::csv_utils::CsvBuilder;
-    ///
-    /// let builder = CsvBuilder::new()
-    ///     .set_header(&["Column1", "Column2", "Column3"])
-    ///     .add_row(&["Row1-1", "Row1-2", "Row1-3"])
-    ///     .save("/path/to/your/file.csv");
-    /// ```
-    ///
-    /// Creates a `CsvBuilder`, adds a data row, and then saves the data as a new CSV file.
-
     pub fn add_row(mut self, row: &[&str]) -> Self {
         if self.error.is_none() {
             let row_vec = row.iter().map(|s| s.to_string()).collect();
@@ -198,20 +189,6 @@ impl CsvBuilder {
     }
 
     /// Adds multiple data rows to the CSV.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use rgwml::csv_utils::CsvBuilder;
-    ///
-    /// let builder = CsvBuilder::new()
-    ///     .set_header(&["Column1", "Column2", "Column3"])
-    ///     .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
-    ///     .save("/path/to/your/file.csv");
-    /// ```
-    ///
-    /// Creates a `CsvBuilder`, adds multiple data rows, and then saves the data as a new CSV file.
-
     pub fn add_rows(mut self, rows: &[&[&str]]) -> Self {
         if self.error.is_none() {
             for row in rows {
@@ -227,61 +204,7 @@ impl CsvBuilder {
     ///
     /// This flexibility allows you to control column placement in various scenarios, such as
     /// moving columns to the start, end, or between existing columns.
-
-    /// ## Examples
-    ///
-    /// ### Moving Columns to the Start of the Order
-    ///
-    /// ```rust
-    /// use rgwml::csv_utils::CsvBuilder;
-    ///
-    /// let builder = CsvBuilder::new()
-    ///     .set_header(&["Column3", "Column1", "Column2"])
-    ///     .add_rows(&[&["Row2-3", "Row2-1", "Row2-2"], &["Row1-3", "Row1-1", "Row1-2"]])
-    ///     .column_order(vec!["Column1", "Column2", "...", "Column3"])
-    ///     .save("/path/to/your/file.csv");
-    /// ```
-    ///
-    /// In this example, we have a CSV with columns `"Column3"`, `"Column1"`, and `"Column2"`.
-    /// By specifying `"Column1"`, `"Column2"`, `...`, and then `"Column3"` in the `column_order` method,
-    /// we indicate that `"Column1"` and `"Column2"` should be moved to the start of the column order,
-    /// and `"Column3"` should follow.
-
-    /// ### Moving Columns to the End of the Order
-    ///
-    /// ```rust
-    /// use rgwml::csv_utils::CsvBuilder;
-    ///
-    /// let builder = CsvBuilder::new()
-    ///     .set_header(&["Column1", "Column2", "Column3"])
-    ///     .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
-    ///     .column_order(vec!["Column3", "Column1", "...", "Column2"])
-    ///     .save("/path/to/your/file.csv");
-    /// ```
-    ///
-    /// In this example, we have a CSV with columns `"Column1"`, `"Column2"`, and `"Column3"`.
-    /// By specifying `"Column3"`, `"Column1"`, `...`, and then `"Column2"` in the `column_order` method,
-    /// we indicate that `"Column3"` and `"Column1"` should be moved to the end of the column order,
-    /// and `"Column2"` should follow.
-
-    /// ### Placing Columns in Between
-    ///
-    /// ```rust
-    /// use rgwml::csv_utils::CsvBuilder;
-    ///
-    /// let builder = CsvBuilder::new()
-    ///     .set_header(&["Column1", "Column4", "Column5", "Column2"])
-    ///     .add_rows(&[&["Row1-1", "Row1-4", "Row1-5", "Row1-2"], &["Row2-1", "Row2-4", "Row2-5", "Row2-2"]])
-    ///     .column_order(vec!["Column1", "...", "Column5", "Column2"])
-    ///     .save("/path/to/your/file.csv");
-    /// ```
-    ///
-    /// In this example, we have a CSV with columns `"Column1"`, `"Column4"`, `"Column5"`, and `"Column2"`.
-    /// By specifying `"Column1"`, `...`, `"Column5"`, and `"Column2"` in the `column_order` method,
-    /// we indicate that `"Column1"` should be placed at the start, `"Column5"` should be placed between
-    /// `"Column1"` and `"Column2"`, and `"Column4"` retains its original position.
-
-    pub fn column_order(mut self, order: Vec<&str>) -> Self {
+    pub fn order_columns(&mut self, order: Vec<&str>) -> &mut Self {
         // Clone the headers for creating column_map
         let headers_for_map = self.headers.clone();
 
@@ -350,29 +273,87 @@ impl CsvBuilder {
         self
     }
 
-    /// Sorts the CSV data based on specified column orders.
-    ///
-    /// # Parameters
-    ///
-    /// - `orders`: A vector of tuples specifying column names and sorting orders (e.g., [("Column1", "ASC"), ("Column2", "DESC")]).
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use rgwml::csv_utils::CsvBuilder;
-    ///
-    /// let builder = CsvBuilder::new()
-    ///     .set_header(&["Column1", "Column2", "Column3"])
-    ///     .add_rows(&[&["Row2-1", "Row2-2", "Row2-3"], &["Row1-1", "Row1-2", "Row1-3"]])
-    ///     .column_order(vec!["Column1", "...", "Column5", "Column2"])
-    ///     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")]) // WARNING! MUST BE CHAINED
-    ///     AFTER column_order
-    ///     .save("/path/to/your/file.csv");
-    /// ```
-    ///
-    /// Creates a `CsvBuilder`, adds data rows, performs a cascading sort based on column orders (must be applied after `set_header` and `add_rows`), and then saves the data as a new CSV file.
+    /// Prints the column names of the CSV data, and returns self
+    pub fn print_columns(&mut self) -> &mut Self {
+        println!();
+        for header in &self.headers {
+            println!("{}", header);
+        }
+        self
+    }
 
-    pub fn cascade_sort(mut self, orders: Vec<(&str, &str)>) -> Self {
+    /// Prints the number of data rows in the CSV.
+    pub fn print_row_count(&mut self) -> &mut Self {
+        // The number of rows is the length of the data vector.
+        // Assuming the first row is the header and is not included in the count.
+        let row_count = self.data.len();
+        println!();
+        println!("Row count: {}", row_count);
+
+        self
+    }
+
+    /// Helper function to print a row in a JSON-like format.
+    fn print_row_json(&self, row: &[String]) {
+        println!("{{");
+        for (header, value) in self.headers.iter().zip(row.iter()) {
+            println!("  \"{}\": \"{}\",", header, value);
+        }
+        println!("}}");
+    }
+
+    /// Prints the first row of the CSV data.
+    pub fn print_first_row(&mut self) -> &mut Self {
+        println!();
+        if let Some(first_row) = self.data.first() {
+            println!("First row:");
+            self.print_row_json(first_row);
+        } else {
+            println!("CSV is empty.");
+        }
+        self
+    }
+
+    /// Prints the last row of the CSV data.
+    pub fn print_last_row(&mut self) -> &mut Self {
+        println!();
+        if let Some(last_row) = self.data.last() {
+            println!("Last row:");
+            self.print_row_json(last_row);
+        } else {
+            println!("CSV is empty.");
+        }
+        self
+    }
+
+    /// Prints rows within a specified range from the CSV data.
+    pub fn print_rows_range(&mut self, start: usize, end: usize) -> &mut Self {
+        let rows = self.data.get(start..end).unwrap_or(&[]);
+        println!();
+        for (offset, row) in rows.iter().enumerate() {
+            let index = start + offset; // Adjusting the index
+            println!("Row {}: ", index);
+            self.print_row_json(row);
+        }
+        self
+    }
+
+    /// Prints all rows of the CSV data.
+    pub fn print_rows(&mut self) -> &mut Self {
+        println!();
+        for (index, row) in self.data.iter().enumerate() {
+            println!("Row {}: ", index);
+            self.print_row_json(row);
+        }
+
+        // Print the total count of rows
+        println!("\nTotal rows: {}", self.data.len());
+        self
+    }
+
+    /// Sorts the CSV data based on specified column orders.
+    pub fn cascade_sort<'a>(&'a mut self, orders: Vec<(&'a str, &'a str)>) -> &'a mut Self {
+        // pub fn cascade_sort(mut self, orders: Vec<(&str, &str)>) -> &mut Self {
         if let Some(header_row) = self.data.first().cloned() {
             // Clone the header row
             let column_indices: HashMap<&str, usize> = header_row
@@ -401,5 +382,158 @@ impl CsvBuilder {
             });
         }
         self
+    }
+
+    /// Drops specified columns from the CSV data.
+    pub fn drop_columns(&mut self, columns: Vec<&str>) -> &mut Self {
+        let columns_set: HashSet<&str> = columns.into_iter().collect();
+
+        // Filter out the headers and indices of columns to be dropped
+        let remaining_headers = self
+            .headers
+            .iter()
+            .enumerate()
+            .filter(|(_, h)| !columns_set.contains(h.as_str()))
+            .map(|(i, h)| (i, h.clone()))
+            .collect::<Vec<(usize, String)>>();
+
+        // Rebuild the data without the dropped columns
+        self.data = self
+            .data
+            .iter()
+            .map(|row| {
+                remaining_headers
+                    .iter()
+                    .map(|(i, _)| row[*i].clone())
+                    .collect()
+            })
+            .collect();
+
+        // Update headers
+        self.headers = remaining_headers.into_iter().map(|(_, h)| h).collect();
+
+        self
+    }
+
+    /// Renames specified columns in the CSV data.
+    pub fn rename_columns(&mut self, renames: Vec<(&str, &str)>) -> &mut Self {
+        let rename_map: HashMap<&str, &str> = renames.into_iter().collect();
+
+        self.headers = self
+            .headers
+            .iter()
+            .map(|h| {
+                // Convert &String to &str for the unwrap_or part
+                let h_str = h.as_str();
+                rename_map.get(h_str).unwrap_or(&h_str).to_string()
+            })
+            .collect();
+
+        self
+    }
+
+    /// Filters the rows based on a column name, condition, value, and comparison type.
+    pub fn where_(
+        &mut self,
+        column_name: &str,
+        operation: &str,
+        value: &str,
+        compare_as: &str,
+    ) -> &mut Self {
+        if let Some(column_index) = self.headers.iter().position(|h| h == column_name) {
+            // Replace the existing data with an empty vector to allow for filtering
+            let original_data = std::mem::replace(&mut self.data, Vec::new());
+
+            let filtered_data = original_data.into_iter().filter(|row| {
+
+
+                if let Some(cell_value) = row.get(column_index) {
+                    match compare_as {
+                        "compare as text" => match operation {
+                            "==" => cell_value == value,
+                            "contains" => cell_value.contains(value),
+                            _ => false,
+                        },
+                        "compare as numbers" => {
+                            match (cell_value.parse::<f64>(), value.parse::<f64>()) {
+                                (Ok(n1), Ok(n2)) => match operation {
+                                    "==" => n1 == n2,
+                                    ">" => n1 > n2,
+                                    "<" => n1 < n2,
+                                    _ => false,
+                                },
+                                _ => {
+                                    println!("Failed to parse as numbers: '{}' or '{}'", cell_value, value);
+                                    false
+                                }
+                            }
+                        },
+                        "compare as timestamps" => {
+                            let parsed_row_value = CsvBuilder::parse_timestamp(cell_value);
+                            let parsed_compare_value = CsvBuilder::parse_timestamp(value);
+
+                            match (parsed_row_value, parsed_compare_value) {
+                                (Ok(row_date), Ok(compare_date)) => match operation {
+                                    "==" => row_date == compare_date,
+                                    ">" => row_date > compare_date,
+                                    "<" => row_date < compare_date,
+                                    _ => false,
+                                },
+                                _ => {
+                                    println!("Error comparing timestamps. Unable to parse '{}' or '{}' as timestamps.", cell_value, value);
+                                    false
+                                }
+                            }
+                        },
+                        _ => {
+                            println!("Unknown comparison type: '{}'", compare_as);
+                            false
+                        }
+                    }
+                } else {
+                    false
+                    // None.is_some()
+                    //println!("Column '{}' not found in row.", column_name);
+                    //false
+                }
+            }).collect();
+
+            // Reassign the filtered data back to self.data
+            self.data = filtered_data;
+        } else {
+            println!("Column '{}' not found in headers.", column_name);
+        }
+        self
+    }
+
+    /// Helper function to parse timestamps
+    fn parse_timestamp(time_str: &str) -> Result<NaiveDateTime, String> {
+        let formats = vec![
+            "%Y-%m-%d %H:%M:%S",
+            "%+",
+            "%Y-%m-%dT%H:%M:%S%z",
+            "%Y-%m-%d",
+            "%m/%d/%Y %I:%M:%S %p",
+            // Add other formats as needed
+        ];
+
+        let parsed_date = formats
+            .iter()
+            .find_map(|&format| NaiveDateTime::parse_from_str(time_str, format).ok())
+            .or_else(|| {
+                DateTime::parse_from_rfc2822(time_str)
+                    .map(|dt| dt.naive_local())
+                    .ok()
+            })
+            .or_else(|| {
+                DateTime::parse_from_rfc3339(time_str)
+                    .map(|dt| dt.naive_local())
+                    .ok()
+            });
+
+        match parsed_date {
+            Some(date) => Ok(date),
+            None => Err(format!("Unable to parse '{}' as a timestamp", time_str)),
+        }
     }
 }

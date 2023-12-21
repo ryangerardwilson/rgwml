@@ -325,9 +325,9 @@
 //!     });
 //!     let response = ApiCallBuilder::call(
 //!             method,            
-//!             url, 
+//!             url,
 //!             Some(headers),
-//!             Some(payload) 
+//!             Some(payload)
 //!         )
 //!         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
 //!         .execute()
@@ -344,37 +344,76 @@
 //!
 //! ### csv_utils
 //!
-//! This module features the CsvBuilder, a fluent interface for creating and writing to CSV files.
+//! This module features the CsvBuilder, a fluent interface for creating, analyzing, and saving CSV files. This module simplifies interactions with CSV data, allowing for a range of operations such as creating new files, modifying existing files, or working with DataFrame structures.
+//!
+//! #### Instantiating a CsvBuilder Object
+//!
+//! Example 1: Creating a New Object
 //! ```
-//! // Create a CsvBuilder instance for a new CSV file
 //! use rgwml::csv_utils::CsvBuilder;
 //!
 //! let builder = CsvBuilder::new()
-//!     .set_header(&["Column3", "Column1", "Column2"]) // Set CSV header
-//!     .add_rows(&[&["Row2-3", "Row2-1", "Row2-2"], &["Row1-3", "Row1-1", "Row1-2"]]) // Add multiple rows
-//!     .column_order(vec!["Column1", "Column2", "...", "Column3"]) // Manipulate column order
-//!     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")]); // Sort the data, must be
-//!     called after column_order
+//!     .set_header(&["Column1", "Column2", "Column3"])
+//!     .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
 //!     .save_as("/path/to/your/file.csv");
+//! ```
 //!
-//! // Create a CsvBuilder instance from a DataFrame
+//! Example 2: Loading from an Existing File
+//! ```
+//! use rgwml::csv_utils::CsvBuilder;
+//!
+//! let builder = CsvBuilder::from_csv("/path/to/existing/file.csv");
+//! ```
+//!
+//! Example 3: Loading from a DataFrame Object
+//! ```
 //! use rgwml::csv_utils::CsvBuilder;
 //! use rgwml::df_utils::DataFrame;
 //!
-//! let data_frame = // Your DataFrame initialization here
+//! let data_frame = // Initialize your DataFrame here
 //! let builder = CsvBuilder::from_dataframe(data_frame)
-//! .set_header(&["Column1", "Column2", "Column3"]) // Set CSV header
-//! .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]]) // Add data rows
-//! .save_as("/path/to/your/file.csv"); // Save the CSV data to a file
+//!     .set_header(&["Column1", "Column2", "Column3"])
+//!     .save_as("/path/to/your/file.csv");
+//! ```
 //!
-//! // Create a CsvBuilder instance from an existing csv path
+//! #### Manipulating a CsvBuilder Object for Analysis or Saving
+//!
+//! ```
 //! use rgwml::csv_utils::CsvBuilder;
 //!
-//! let builder = CsvBuilder::from_csv("/path/to/existing/file.csv")
-//! .set_header(&["NewColumn1", "NewColumn2", "NewColumn3"]) // Set a new header
-//! .add_row(&["NewRow1-1", "NewRow1-2", "NewRow1-3"]) // Add a new row
-//! .save_as("/path/to/your/file.csv"); // Save the modified CSV data to a new file
+//! let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
+//!     .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
+//!     .drop_columns(vec!["UNUSED_COLUMN"])
+//!     .cascade_sort(vec![("COLUMN", "ASC")])
+//!     .print_row_count()
+//!     .save_as("/path/to/modified/file.csv");
 //! ```
+//!
+//! #### Discovering Chainable Options
+//!
+//! ```
+//! let builder = CsvBuilder::new()
+//!     .get_options(); // Outputs available options and their syntax
+//! ```
+//!
+//! Chainable Options in `CsvBuilder`
+//!
+//! - **`.save_as(path: &str)`**: Saves the current state of the CSV to a specified file path.
+//! - **`.set_header(columns: &[&str])`**: Sets the header (column names) of the CSV file.
+//! - **`.add_row(row: &[&str])`**: Adds a single row to the CSV file.
+//! - **`.add_rows(rows: &[&[&str]])`**: Adds multiple rows to the CSV file.
+//! - **`.order_columns(order: Vec<&str>)`**: Orders columns in the specified sequence.
+//! - **`.print_columns()`**: Prints the names of the columns in the CSV file.
+//! - **`.print_row_count()`**: Prints the total number of rows in the CSV file.
+//! - **`.print_first_row()`**: Prints the first row of the CSV file in a JSON-like format.
+//! - **`.print_last_row()`**: Prints the last row of the CSV file in a JSON-like format.
+//! - **`.print_rows_range(start: usize, end: usize)`**: Prints a range of rows.
+//! - **`.print_rows()`**: Prints all rows in the CSV file.
+//! - **`.cascade_sort(sort_order: Vec<(&str, &str)>)`**: Sorts the data in the CSV file.
+//! - **`.drop_columns(columns: Vec<&str>)`**: Removes specified columns from the CSV file.
+//! - **`.rename_columns(rename_map: Vec<(&str, &str)>)`**: Renames columns as specified.
+//! - **`.where_(column: &str, operator: &str, value: &str, comparison_type: &str)`**: Filters rows based on a condition.
+//!
 //! ## License
 //!
 //! This project is licensed under the MIT License - see the LICENSE file for details.
