@@ -8,13 +8,6 @@ license = "MIT"
 repository = "https://github.com/ryangerardwilson/rgwml"
 documentation = "https://docs.rs/rgwml/latest/rgwml/"
 
-[package.metadata.docs.rs]
-all-features = false
-default-features = false
-
-[package.metadata.docs.rs.target.'cfg(target_os = "linux")']
-features = ["ubuntu_docs"]
-
 [dependencies]
 csv = "1.1"
 reqwest = { version = "0.11", features = ["json"] }
