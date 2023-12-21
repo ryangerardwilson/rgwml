@@ -1,6 +1,5 @@
 // csv_utils.rs
 use crate::df_utils::DataFrame;
-use crate::api_utils::ApiCallBuilder;
 use chrono::{DateTime, NaiveDateTime};
 use csv::Writer;
 use futures::executor::block_on;
