@@ -413,42 +413,49 @@ This integrated example demonstrates the full process of data transformation and
 
 This module features the APICallBuilder a fluent interface to build API requests with support for method chaining. It simplifies the process by allowing you to specify both headers and payload as `serde_json::Value`. This approach is convenient when dealing with JSON data, making it easy to construct requests dynamically. If caching is enabled, responses are stored and reused for subsequent requests made within the specified cache duration.
 
-Example 1: Without Headers
-
     use serde_json::json;
     use rgwml::api_utils::ApiCallBuilder;
+    use std::collections::HashMap;
 
     #[tokio::main]
     async fn main() {
-        let method = "POST"; // Or "GET"
+        let result = fetch_and_cache_post_request().await;
+        match result {
+            Ok(response) => println!("Response: {:?}", response),
+            Err(e) => eprintln!("Failed to fetch data: {}", e),
+        }
+
+        let result_with_headers = fetch_and_cache_post_request_with_headers().await;
+        match result_with_headers {
+            Ok(response) => println!("Response with headers: {:?}", response),
+            Err(e) => eprintln!("Failed to fetch data with headers: {}", e),
+        }
+
+        let result_form_urlencoded = fetch_and_cache_post_request_form_urlencoded().await;
+        match result_form_urlencoded {
+            Ok(response) => println!("Form URL encoded response: {:?}", response),
+            Err(e) => eprintln!("Failed to fetch form URL encoded data: {}", e),
+        }
+    }
+
+    // Example 1: Without Headers
+    async fn fetch_and_cache_post_request() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
         let url = "http://example.com/api/submit";
         let payload = json!({
             "field1": "Hello",
             "field2": 123
         });
-        let response = ApiCallBuilder::call(
-            method,
-            url,
-            None, // No custom headers
-            Some(payload)
-        ).maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
-        .execute()
-        .await
-        .unwrap();
-     
-        dbg!(response);
+
+        ApiCallBuilder::call(method, url, None, Some(payload))
+            .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
+            .execute()
+            .await
     }
 
-
-Example 2: With Headers
-
-    use reqwest::Method;
-    use serde_json::json;
-    use rgwml::api_utils::ApiCallBuilder;
-
-    #[tokio::main]
-    async fn main() {
-        let method = "POST"; // Or "GET"
+    // Example 2: With Headers
+    async fn fetch_and_cache_post_request_with_headers() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
         let url = "http://example.com/api/submit";
         let headers = json!({
             "Content-Type": "application/json",
@@ -458,49 +465,31 @@ Example 2: With Headers
             "field1": "Hello",
             "field2": 123
         });
-        let response = ApiCallBuilder::call(
-             method,
-             url,
-             Some(headers), // Custom headers
-             Some(payload)
-         )
-         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
-         .execute()
-         .await
-         .unwrap();
 
-        dbg!(response);
+        ApiCallBuilder::call(method, url, Some(headers), Some(payload))
+            .maintain_cache(30, "/path/to/post_with_headers_cache.json") // Uses cache for 30 minutes
+            .execute()
+            .await
     }
 
-Example 3: With application/x-www-form-urlencoded Content-Type
-
-    use serde_json::json;
-    use rgwml::api_utils::ApiCallBuilder;
-    use std::collections::HashMap;
-
-    #[tokio::main]
-    async fn main() {
-        let method = "POST"; // Or "GET"
+    // Example 3: With application/x-www-form-urlencoded Content-Type
+    async fn fetch_and_cache_post_request_form_urlencoded() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
         let url = "http://example.com/api/submit";
         let headers = json!({
             "Content-Type": "application/x-www-form-urlencoded"
         });
-        let payload = json!({
-            "field1": "value1",
-            "field2": "value2"
-        });
-        let response = ApiCallBuilder::call(
-            method,            
-            url, 
-            Some(headers),
-            Some(payload)
-        ).maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
-         .execute()
-         .await
-         .unwrap();
-        
-        dbg!(response);
+        let payload = HashMap::from([
+            ("field1", "value1"),
+            ("field2", "value2"),
+        ]);
+
+        ApiCallBuilder::call(method, url, Some(headers), Some(payload))
+            .maintain_cache(30, "/path/to/post_form_urlencoded_cache.json") // Uses cache for 30 minutes
+            .execute()
+            .await
     }
+
 
 These examples demonstrate how to use the ApiCallBuilder with and without custom headers. Since the headers and payload are specified as `serde_json::Value`, it offers flexibility in constructing various types of requests.
 

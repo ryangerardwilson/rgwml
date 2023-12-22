@@ -128,6 +128,110 @@ pub struct ApiCallBuilder {
 }
 
 impl ApiCallBuilder {
+
+        pub fn get_docs() -> String {
+        let docs = r#"
+
+++++++++++++++++++++++++++++++++
++> ApiCallBuilder Documentation <+
+++++++++++++++++++++++++++++++++
+
+    use serde_json::json;
+    use rgwml::api_utils::ApiCallBuilder;
+    use std::collections::HashMap;
+
+    #[tokio::main]
+    async fn main() {
+        // Fetch and cache post request without headers
+        let response = fetch_and_cache_post_request().await.unwrap_or_else(|e| {
+            eprintln!("Failed to fetch data: {}", e);
+            std::process::exit(1);
+        });
+        println!("Response: {:?}", response);
+
+        // Fetch and cache post request with headers
+        let response_with_headers = fetch_and_cache_post_request_with_headers().await.unwrap_or_else(|e| {
+            eprintln!("Failed to fetch data with headers: {}", e);
+            std::process::exit(1);
+        });
+        println!("Response with headers: {:?}", response_with_headers);
+
+        // Fetch and cache post request with form URL encoded content type
+        let response_form_urlencoded = fetch_and_cache_post_request_form_urlencoded().await.unwrap_or_else(|e| {
+            eprintln!("Failed to fetch form URL encoded data: {}", e);
+            std::process::exit(1);
+        });
+        println!("Form URL encoded response: {:?}", response_form_urlencoded);
+    }
+
+    // Example 1: Without Headers
+    async fn fetch_and_cache_post_request() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
+        let url = "http://example.com/api/submit";
+        let payload = json!({
+            "field1": "Hello",
+            "field2": 123
+        });
+
+        let response = ApiCallBuilder::call(method, url, None, Some(payload))
+            .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
+            .execute()
+            .await?;
+
+        Ok(response)
+    }
+
+    // Example 2: With Headers
+    async fn fetch_and_cache_post_request_with_headers() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
+        let url = "http://example.com/api/submit";
+        let headers = json!({
+            "Content-Type": "application/json",
+            "Authorization": "Bearer your_token_here"
+        });
+        let payload = json!({
+            "field1": "Hello",
+            "field2": 123
+        });
+
+        let response = ApiCallBuilder::call(method, url, Some(headers), Some(payload))
+            .maintain_cache(30, "/path/to/post_with_headers_cache.json") // Uses cache for 30 minutes
+            .execute()
+            .await?;
+
+        Ok(response)
+    }
+
+    // Example 3: With application/x-www-form-urlencoded Content-Type
+    async fn fetch_and_cache_post_request_form_urlencoded() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
+        let url = "http://example.com/api/submit";
+        let headers = json!({
+            "Content-Type": "application/x-www-form-urlencoded"
+        });
+        let payload = HashMap::from([
+            ("field1", "value1"),
+            ("field2", "value2"),
+        ]);
+
+        let response = ApiCallBuilder::call(method, url, Some(headers), Some(payload))
+            .maintain_cache(30, "/path/to/post_form_urlencoded_cache.json") // Uses cache for 30 minutes
+            .execute()
+            .await?;
+
+        Ok(response)
+    }
+
+"#;
+        // docs.to_string();
+
+        println!("{}", docs.to_string());
+
+        docs.to_string()
+    }
+
+
+
     pub fn call(
         method: &str,
         url: &str,

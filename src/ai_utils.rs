@@ -9,6 +9,7 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use regex::Regex;
 
 //pub type DataFrame = Vec<HashMap<String, Value>>;
 
@@ -165,7 +166,10 @@ pub enum WordLengthSensitivity {
 /// # Returns
 /// - A `Result` containing a `String` upon success, or an error wrapped in a `Box<dyn Error>` upon failure.
 pub async fn fuzzai<'a>(
-    neural_associations_dataframe: DataFrame,
+    csv_file_path: &str,
+    input_column: &str,
+    output_column: &str,
+    //neural_associations_dataframe: DataFrame,
     //neural_associations: &'a [NeuralAssociations2D],
     text_in_focus: &str,
     task_name: &str,
@@ -252,7 +256,12 @@ pub async fn fuzzai<'a>(
         show_complications: &ShowComplications,
         word_length_sensitivity: &WordLengthSensitivity,
     ) -> Result<String, Box<dyn Error>> {
-        let message_str = message;
+
+    // Create a regex to match non-alphabetic characters
+    let re = Regex::new(r"[^a-zA-Z\s]").unwrap();
+
+    // Replace all non-alphabetic characters with nothing
+    let message_str = re.replace_all(message, "");
 
         let split_words: Vec<&str> = message_str.split_whitespace().collect();
 
@@ -357,10 +366,35 @@ pub async fn fuzzai<'a>(
         }
     }
 
+    /*
     let neural_associations: Vec<NeuralAssociations2D> = neural_associations_dataframe
         .into_iter()
         .map(|row| serde_json::from_value(serde_json::to_value(row).unwrap()).unwrap())
         .collect();
+    */
+
+    let mut rdr = csv::Reader::from_path(csv_file_path)?;
+    let mut neural_associations = Vec::new();
+
+    // Create a regex to match non-alphabetic and non-whitespace characters
+    let re = Regex::new(r"[^a-zA-Z\s]").unwrap();
+
+    for result in rdr.deserialize() {
+        let record: HashMap<String, String> = result?;
+
+        let input_raw = record.get(input_column)
+                              .ok_or("Input column not found")?;
+        let input = re.replace_all(input_raw, "")
+                      .to_string();
+
+        let output_raw = record.get(output_column)
+                               .ok_or("Output column not found")?;
+        let output = re.replace_all(output_raw, "")
+                       .to_string();
+
+        neural_associations.push(NeuralAssociations2D { input, output });
+    } 
+
 
     let data_arc = Arc::new(neural_associations);
 
