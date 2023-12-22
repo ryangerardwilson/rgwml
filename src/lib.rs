@@ -209,59 +209,35 @@
 //!
 //! ## ai_utils
 //!
-//! Provides simple AI utilities for neural association analysis. It offers tools to process and analyze data in the context of neural networks, with a focus on understanding decision-making processes and text analysis in a parallel computing environment.
+//! This library provides simple AI utilities for neural association analysis. It focuses on processing and analyzing data within neural networks, with an emphasis on understanding AI decision-making processes and text analysis, optimized for a parallel computing environment.
 //!
 //! Features
 //!
-//! - **Convert DataFrames**: Transform your data into a format suitable for neural association analysis.
-//! - **Parallel Processing**: Analyze neural associations in parallel, revealing insights into AI decision-making.
-//!
-//! Usage
-//!
-//! First, convert your data into a suitable `DataFrame` format. Then, analyze the data using `fuzzai` for concurrent neural association analysis.
+//!- **Direct CSV Input**: Utilize CSV file paths directly, specifying input and output column names, to facilitate neural association analysis.
+//!- **Parallel Processing**: Leverage parallel computing to efficiently analyze neural associations, gaining insights into AI decision-making processes.
 //!
 //! Example
+//!```
+//!     use rgwml::ai_utils::{fuzzai, SplitUpto, ShowComplications, WordLengthSensitivity};
+//!     use std::error::Error;
 //!
-//! ```
-//! use rgwml::ai_utils::{NeuralAssociations2DDataFrameConfig, create_neural_associations_2d_df, fuzzai, SplitUpto, ShowComplications, WordLengthSensitivity};
-//! use rgwml::df_utils::DataFrame;
-//! use std::collections::HashMap;
-//! use serde_json::Value;
+//!     #[tokio::main]
+//!     async fn main() {
+//!         // Call the fuzzai function with CSV file path
+//!         let fuzzai_result = fuzzai(
+//!             "path/to/your/csv/file.csv",
+//!             "input_column_name",
+//!             "output_column_name",
+//!             "your text to be analyzed against the training data",
+//!             "fuzzai_analysis",
+//!             SplitUpto::WordSetLength(2),
+//!             ShowComplications::False,
+//!             WordLengthSensitivity::Coefficient(0.2),
+//!         ).await.expect("Analysis should succeed");
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     // Prepare the raw data
-//!     let mut data_frame = Vec::new();
-//!     let mut record = HashMap::new();
-//!     record.insert("address".to_string(), Value::String("123 Main St".to_string()));
-//!     record.insert("name".to_string(), Value::String("John Doe".to_string()));
-//!     data_frame.push(record);
+//!         dbg!(fuzzai_result);
 //!
-//!     // Configure and convert the DataFrame
-//!     let config = NeuralAssociations2DDataFrameConfig {
-//!         input_column: "address",
-//!         output_column: "name",
-//!     };
-//!     let neural_association_df = create_neural_associations_2d_df(data_frame, config);
-//!
-//!     // Analyze using fuzzai
-//!     let text_in_focus = "123 Main St";
-//!     let task_name = "Address Analysis";
-//!     let result = fuzzai(
-//!         neural_association_df,
-//!         text_in_focus,
-//!         task_name,
-//!         SplitUpto::WordSetLength(2),
-//!         ShowComplications::False,
-//!         WordLengthSensitivity::Coefficient(0.2)
-//!     ).await.expect("Analysis should succeed");
-//!
-//!     dbg!(result);
-//!
-//! }
-//! ```
-//!
-//! This integrated example demonstrates the full process of data transformation and analysis, highlighting the capabilities of the `rgwml` library in neural association studies. This library is perfect for applications where AI's interpretation of data patterns and decision-making processes are crucial.
+//!         }
 //!
 //! ## api_utils
 //!
