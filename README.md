@@ -53,6 +53,176 @@ Easily print example synatax relating to this feature in your workflow.
 
     }
 
+### CsvConverter
+
+    use serde_json::json;
+    use tokio;
+    use rgwml::csv_utils::CsvConverter;
+    use rgwml::api_utils::ApiCallBuilder;
+
+    // Function to fetch sales data from an API
+    async fn fetch_sales_data_from_api() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
+        let url = "http://example.com/api/sales"; // API URL to fetch sales data
+
+        // Payload for the API call
+        let payload = json!({
+            "date": "2023-12-21"
+        });
+
+        // Performing the API call
+        let response = ApiCallBuilder::call(method, url, None, Some(payload))
+            .execute()
+            .await?;
+
+        Ok(response)
+    }
+
+    // Main function with tokio's async runtime
+    #[tokio::main]
+    async fn main() {
+        // Fetch sales data and handle potential errors inline
+        let sales_data_response = fetch_sales_data_from_api().await.unwrap_or_else(|e| {
+            eprintln!("Failed to fetch sales data: {}", e);
+            std::process::exit(1); // Exit the program in case of an error
+        });
+
+        // Convert the fetched JSON data to CSV
+        CsvConverter::from_json(&sales_data_response, "path/to/your/file.csv")
+            .expect("Failed to convert JSON to CSV"); // Handle errors in CSV conversion
+    }
+
+### CsvBuilder
+
+#### Instantiation
+
+Example 1: Creating a new object
+
+    use rgwml::csv_utils::CsvBuilder;
+
+    let builder = CsvBuilder::new()
+        .set_header(&["Column1", "Column2", "Column3"])
+        .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
+        .save_as("/path/to/your/file.csv");
+
+Example 2: Load from an existing file
+
+    use rgwml::csv_utils::CsvBuilder;
+
+    let builder = CsvBuilder::from_csv("/path/to/existing/file.csv");
+
+Example 3: Load from a DataFrame object
+
+    use rgwml::csv_utils::CsvBuilder;
+    use rgwml::df_utils::DataFrame;
+
+    let data_frame = // Initialize your DataFrame here
+    let builder = CsvBuilder::from_dataframe(data_frame)
+        .save_as("/path/to/your/file.csv");
+
+####  Manipulating a CsvBuilder Object for Analysis or Saving
+
+    use rgwml::csv_utils::CsvBuilder;
+
+    let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
+        .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
+        .drop_columns(vec!["UNUSED_COLUMN"])
+        .cascade_sort(vec![("COLUMN", "ASC")])
+        .where_("address","FUZZ_MIN_SCORE_70",vec!["new delhi","jerusalem"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
+        .print_row_count()
+        .save_as("/path/to/modified/file.csv");
+
+#### Discovering Chainable Options
+
+    let builder = CsvBuilder::new()
+        .get_options(); // Outputs available options and their syntax
+
+#### List of Flexibly Chainable Methods
+
+    .save_as("/path/to/your/file.csv")
+    .set_header(&["Column1", "Column2", "Column3"]) // Only on CsvBuilder::new() instantiations
+    .add_row(&["Row1-1", "Row1-2", "Row1-3"])
+    .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
+    .order_columns(vec!["Column1", "...", "Column5", "Column2"])
+    .order_columns(vec!["...", "Column5", "Column2"])
+    .order_columns(vec!["Column1", "Column5", "..."])
+    .print_columns()
+    .print_row_count()
+    .print_first_row()
+    .print_last_row()
+    .print_rows_range(2,5)
+    .print_rows()
+    .print_unique("column_name")
+    .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
+    .drop_columns(vec!["Column1", "Column3"])
+    .rename_columns(vec![("Column1", "NewColumn1"), ("Column3", "NewColumn3")])
+    .where_("column1", "==", "42", "COMPARE_AS_NUMBERS")
+    .where_("column1", "==", "hello", "COMPARE_AS_TEXT"),
+    .where_("column1", "CONTAINS", "apples", "COMPARE_AS_TEXT")
+    .where_("column1", "DOES_NOT_CONTAIN", "apples", "COMPARE_AS_TEXT")
+    .where_("column1", "STARTS_WITH", "discounted", "COMPARE_AS_TEXT")
+    .where_("stated_locality_address","FUZZ_MIN_SCORE_90",vec!["Shastri park","kamal nagar"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
+    .where_("column1", ">", "23-01-01", "COMPARE_AS_TIMESTAMPS")
+    .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting"), // Sets column 9's value to "greeting", where the condition is met. This syntax applies analogously to other where_ clauses as well
+    .limit(10)
+    .add_column_header("NewColumn1")
+    .add_column_headers(vec!["NewColumn2", "NewColumn3"])
+
+#### List of Chainable Methods that Can't Be Subsequently Chained
+
+    .get_unique("column_name") // Returns a Vec<String>
+
+### CsvResultCacher
+
+    use rgwml::api_utils::ApiCallBuilder;
+    use rgwml::csv_utils::{CsvBuilder, CsvResultCacher};
+    use serde_json::json;
+    use tokio;
+
+    async fn generate_daily_sales_report() -> Result<(), Box<dyn std::error::Error>> {
+        async fn fetch_sales_data_from_api() -> Result<String, Box<dyn std::error::Error>> {
+            let method = "POST";
+            let url = "http://example.com/api/sales"; // API URL to fetch sales data
+
+            let payload = json!({
+                "date": "2023-12-21"
+            });
+
+            let response = ApiCallBuilder::call(method, url, None, Some(payload))
+                .execute()
+                .await?;
+
+            Ok(response)
+        }
+
+        let sales_data_response = fetch_sales_data_from_api().await?;
+
+        // Convert the JSON response to CSV format using CsvBuilder
+        let csv_builder = CsvBuilder::from_api_call(sales_data_response)
+            .await
+            .unwrap()
+            .save_as("/path/to/daily_sales_report.csv");
+
+        Ok(())
+    }
+
+    #[tokio::main]
+    async fn main() {
+        let cache_path = "/path/to/daily_sales_report.csv";
+        let cache_duration_minutes = 1440; // Cache duration set to 1 day
+
+        let result = CsvResultCacher::fetch_async(
+            || Box::pin(generate_daily_sales_report()),
+            cache_path,
+            cache_duration_minutes,
+        ).await;
+
+        match result {
+            Ok(_) => println!("Sales report is ready."),
+            Err(e) => eprintln!("Failed to generate sales report: {}", e),
+        }
+    }
+
 3. df_utils
 -----------
 
@@ -255,6 +425,96 @@ Easily print example synatax relating to this feature in your workflow.
         std::process::exit(1);
 
     }
+
+Examples across common API call patterns
+
+    use serde_json::json;
+    use rgwml::api_utils::ApiCallBuilder;
+    use std::collections::HashMap;
+
+    #[tokio::main]
+    async fn main() {
+        // Fetch and cache post request without headers
+        let response = fetch_and_cache_post_request().await.unwrap_or_else(|e| {
+            eprintln!("Failed to fetch data: {}", e);
+            std::process::exit(1);
+        });
+        println!("Response: {:?}", response);
+
+        // Fetch and cache post request with headers
+        let response_with_headers = fetch_and_cache_post_request_with_headers().await.unwrap_or_else(|e| {
+            eprintln!("Failed to fetch data with headers: {}", e);
+            std::process::exit(1);
+        });
+        println!("Response with headers: {:?}", response_with_headers);
+
+        // Fetch and cache post request with form URL encoded content type
+        let response_form_urlencoded = fetch_and_cache_post_request_form_urlencoded().await.unwrap_or_else(|e| {
+            eprintln!("Failed to fetch form URL encoded data: {}", e);
+            std::process::exit(1);
+        });
+        println!("Form URL encoded response: {:?}", response_form_urlencoded);
+    }
+
+    // Example 1: Without Headers
+    async fn fetch_and_cache_post_request() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
+        let url = "http://example.com/api/submit";
+        let payload = json!({
+            "field1": "Hello",
+            "field2": 123
+        });
+
+        let response = ApiCallBuilder::call(method, url, None, Some(payload))
+            .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
+            .execute()
+            .await?;
+
+        Ok(response)
+    }
+
+    // Example 2: With Headers
+    async fn fetch_and_cache_post_request_with_headers() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
+        let url = "http://example.com/api/submit";
+        let headers = json!({
+            "Content-Type": "application/json",
+            "Authorization": "Bearer your_token_here"
+        });
+        let payload = json!({
+            "field1": "Hello",
+            "field2": 123
+        });
+
+        let response = ApiCallBuilder::call(method, url, Some(headers), Some(payload))
+            .maintain_cache(30, "/path/to/post_with_headers_cache.json") // Uses cache for 30 minutes
+            .execute()
+            .await?;
+
+        Ok(response)
+    }
+
+    // Example 3: With application/x-www-form-urlencoded Content-Type
+    async fn fetch_and_cache_post_request_form_urlencoded() -> Result<String, Box<dyn std::error::Error>> {
+        let method = "POST";
+        let url = "http://example.com/api/submit";
+        let headers = json!({
+            "Content-Type": "application/x-www-form-urlencoded"
+        });
+        let payload = HashMap::from([
+            ("field1", "value1"),
+            ("field2", "value2"),
+        ]);
+
+        let response = ApiCallBuilder::call(method, url, Some(headers), Some(payload))
+            .maintain_cache(30, "/path/to/post_form_urlencoded_cache.json") // Uses cache for 30 minutes
+            .execute()
+            .await?;
+
+        Ok(response)
+    }
+
+
 
 6. License
 ----------
