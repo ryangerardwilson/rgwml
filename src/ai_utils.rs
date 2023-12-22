@@ -2,6 +2,7 @@
 use crate::df_utils::DataFrame;
 use futures::future::join_all;
 use fuzzywuzzy::fuzz;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -9,50 +10,12 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use regex::Regex;
 
 //pub type DataFrame = Vec<HashMap<String, Value>>;
 
 /// The `NeuralAssociations2D` struct represents a basic structure for a two-dimensional neural network model.
 /// It consists of two primary fields: `input` and `output`. These fields are designed to work with string representations
 /// of data, which must be pre-processed or encoded into a suitable format for neural network processing.
-///
-/// # Examples
-///
-/// ```rust
-/// # use your_crate::NeuralAssociations2D;
-/// let neural_network = NeuralAssociations2D {
-///     input: "encoded_input_data".to_string(),
-///     output: "encoded_output_data".to_string(),
-/// };
-/// ```
-///
-/// # Usage
-///
-/// The `input` field is used to feed in the training data. In the context of a 2D neural network,
-/// this data should represent a two-dimensional array, encoded or serialized into a string format.
-/// For example, image data or spatially structured data can be converted into a string that preserves
-/// the two-dimensional relationships within the data.
-///
-/// The `output` field is used to store the expected result or the target for the corresponding input.
-/// This also should be in an encoded string format that the neural network can interpret and use for training.
-///
-/// # Training Process
-///
-/// To train the neural network, a collection of `NeuralAssociations2D` instances should be prepared, each
-/// representing a distinct pair of input and expected output. The training process involves adjusting the
-/// network parameters to minimize the difference between the actual output of the network and the `output`
-/// field in these instances.
-///
-/// It is important to ensure that the encoding used for both input and output fields maintains the
-/// integrity of the two-dimensional data structure, as this is crucial for the effective training and
-/// operation of the 2D neural network.
-///
-/// # Note
-///
-/// This struct assumes that the necessary pre-processing steps to convert raw data into a suitable string format
-/// have been implemented. It is also essential to have a corresponding decoding mechanism to interpret the
-/// network's output for practical applications or further analysis.
 #[derive(Clone, Debug, Deserialize)]
 pub struct NeuralAssociations2D {
     pub input: String,
@@ -115,56 +78,6 @@ pub enum WordLengthSensitivity {
 /// neural associations in parallel, applying a two-dimensional analysis based on the provided parameters.
 /// This function helps in understanding the inner workings of the neural network's
 /// decision-making process in a concurrent environment.
-///
-/// # Arguments
-/// - `neural_associations_dataframe`: A `DataFrame` (Vec<HashMap<String, Value>>), representing the training data.
-///   Each `HashMap` should have keys corresponding to the `input` and `output` fields of `NeuralAssociations2D`.
-/// - `text_in_focus`: A string reference, typically the text to be analyzed or compared against the training data.
-/// - `task_name`: A descriptive name for the task, used primarily for logging or tracking purposes.
-/// - `split_upto`: A `SplitUpto` enum to define the minimal size of text permutations for processing.
-///   It determines how the input text is split for analysis. For example, if set to `SplitUpto::WordSetLength(2)`,
-///   a text "I am a good boy" will be split into "I am", "am a", "a good", "good boy" and all larger permutations.
-/// - `show_complications`: A `ShowComplications` enum to control the verbosity of the function. When set to `True`,
-///   it prints detailed information about all concurrent decisions made during the function's execution.
-/// - `word_length_sensitivity`: A `WordLengthSensitivity` to adjust processing based on word length.
-///
-/// # Examples
-///
-/// ## Preparing the DataFrame
-/// ```rust
-/// let mut data_frame = Vec::new();
-/// let mut record = HashMap::new();
-/// record.insert("input".to_string(), Value::String("Example input".to_string()));
-/// record.insert("output".to_string(), Value::String("Example output".to_string()));
-/// data_frame.push(record);
-/// ```
-///
-/// ## Using `None` for `WordLengthSensitivity`
-/// ```rust
-/// let result = fuzzai(
-///     data_frame,
-///     "Example text",
-///     "Sample Task",
-///     SplitUpto::WordSetLength(5),
-///     ShowComplications::False,
-///     WordLengthSensitivity::None
-/// ).await?;
-/// ```
-///
-/// ## Using a `Coefficient` value
-/// ```rust
-/// let result = fuzzai(
-///     data_frame,
-///     "Example text",
-///     "Sample Task",
-///     SplitUpto::WordSetLength(5),
-///     ShowComplications::True,
-///     WordLengthSensitivity::Coefficient(0.5)
-/// ).await?;
-/// ```
-///
-/// # Returns
-/// - A `Result` containing a `String` upon success, or an error wrapped in a `Box<dyn Error>` upon failure.
 pub async fn fuzzai<'a>(
     csv_file_path: &str,
     input_column: &str,
@@ -256,12 +169,11 @@ pub async fn fuzzai<'a>(
         show_complications: &ShowComplications,
         word_length_sensitivity: &WordLengthSensitivity,
     ) -> Result<String, Box<dyn Error>> {
+        // Create a regex to match non-alphabetic characters
+        let re = Regex::new(r"[^a-zA-Z\s]").unwrap();
 
-    // Create a regex to match non-alphabetic characters
-    let re = Regex::new(r"[^a-zA-Z\s]").unwrap();
-
-    // Replace all non-alphabetic characters with nothing
-    let message_str = re.replace_all(message, "");
+        // Replace all non-alphabetic characters with nothing
+        let message_str = re.replace_all(message, "");
 
         let split_words: Vec<&str> = message_str.split_whitespace().collect();
 
@@ -382,19 +294,14 @@ pub async fn fuzzai<'a>(
     for result in rdr.deserialize() {
         let record: HashMap<String, String> = result?;
 
-        let input_raw = record.get(input_column)
-                              .ok_or("Input column not found")?;
-        let input = re.replace_all(input_raw, "")
-                      .to_string();
+        let input_raw = record.get(input_column).ok_or("Input column not found")?;
+        let input = re.replace_all(input_raw, "").to_string();
 
-        let output_raw = record.get(output_column)
-                               .ok_or("Output column not found")?;
-        let output = re.replace_all(output_raw, "")
-                       .to_string();
+        let output_raw = record.get(output_column).ok_or("Output column not found")?;
+        let output = re.replace_all(output_raw, "").to_string();
 
         neural_associations.push(NeuralAssociations2D { input, output });
-    } 
-
+    }
 
     let data_arc = Arc::new(neural_associations);
 

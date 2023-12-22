@@ -2,12 +2,12 @@
 use crate::df_utils::DataFrame;
 use chrono::{DateTime, NaiveDateTime};
 use csv::Writer;
-use serde_json::Value;
 use futures::executor::block_on;
 use futures::future::join_all;
 use futures::Future;
 use fuzzywuzzy::fuzz;
 use regex::Regex;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
@@ -20,8 +20,7 @@ use std::time::{Duration, SystemTime};
 pub struct CsvConverter;
 
 impl CsvConverter {
-
-        pub fn get_docs() -> String {
+    pub fn get_docs() -> String {
         let docs = r#"
 
 ++++++++++++++++++++++++++++++++
@@ -73,9 +72,7 @@ impl CsvConverter {
         docs.to_string()
     }
 
-
-
-            pub fn from_json(json_data: &str, file_path: &str) -> Result<(), Box<dyn Error>> {
+    pub fn from_json(json_data: &str, file_path: &str) -> Result<(), Box<dyn Error>> {
         let data: Value = serde_json::from_str(json_data)?;
 
         let file = File::create(file_path)?;
@@ -89,10 +86,13 @@ impl CsvConverter {
 
                 for item in items {
                     if let Value::Object(map) = item {
-                        let row: Vec<String> = map.values().map(|v| match v {
-                            Value::String(s) => s.clone(),
-                            _ => v.to_string()
-                        }).collect();
+                        let row: Vec<String> = map
+                            .values()
+                            .map(|v| match v {
+                                Value::String(s) => s.clone(),
+                                _ => v.to_string(),
+                            })
+                            .collect();
                         wtr.write_record(&row)?;
                     }
                 }
@@ -102,7 +102,6 @@ impl CsvConverter {
         wtr.flush()?;
         Ok(())
     }
-
 }
 
 /// Defines the trait for comparison values
@@ -218,9 +217,9 @@ pub struct CsvBuilder {
 }
 
 impl CsvBuilder {
-    /// A function to get available options and their syntax
 
-        pub fn get_docs() -> String {
+    /// A function to print documentation for easy reference
+    pub fn get_docs() -> String {
         let docs = r#"
 
 ++++++++++++++++++++++++++++++
@@ -302,7 +301,7 @@ Example 3: Load from a DataFrame object
     .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting"), // Sets column 9's value to "greeting", where the condition is met. This syntax applies analogously to other where_ clauses as well
     .limit(10)
     .add_column_header("NewColumn1")
-    .add_column_headers(&["NewColumn2", "NewColumn3"])
+    .add_column_headers(vec!["NewColumn2", "NewColumn3"])
 
 ### List of Chainable Methods that Can't Be Subsequently Chained
 
@@ -316,9 +315,7 @@ Example 3: Load from a DataFrame object
         docs.to_string()
     }
 
-
     pub fn get_options(&mut self) -> &mut Self {
-
         let docs = r#"
 
 ++++++++++++++++++++++++
@@ -355,7 +352,7 @@ List of Flexibly Chainable Methods
     .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting"), // Sets column 9's value to "greeting", where the condition is met. This syntax applies analogously to other where_ clauses as well
     .limit(10)
     .add_column_header("NewColumn1")
-    .add_column_headers(&["NewColumn2", "NewColumn3"])
+    .add_column_headers(vec!["NewColumn2", "NewColumn3"])
 
 
 List of Chainable Methods that Can't Be Subsequently Chained
@@ -369,7 +366,6 @@ List of Chainable Methods that Can't Be Subsequently Chained
         println!("{}", docs.to_string());
 
         self
-
     }
 
     /// Creates a new `CsvBuilder` instance with empty headers and data.
@@ -472,37 +468,35 @@ List of Chainable Methods that Can't Be Subsequently Chained
         builder
     }
 
-/// Saves data in the `CsvBuilder` to a new CSV file at `new_file_path`.
-pub fn save_as(&mut self, new_file_path: &str) -> Result<&mut Self, Box<dyn Error>> {
-    let file = File::create(new_file_path)?;
-    let mut wtr = csv::Writer::from_writer(file);
+    /// Saves data in the `CsvBuilder` to a new CSV file at `new_file_path`.
+    pub fn save_as(&mut self, new_file_path: &str) -> Result<&mut Self, Box<dyn Error>> {
+        let file = File::create(new_file_path)?;
+        let mut wtr = csv::Writer::from_writer(file);
 
-    // dbg!(&self.headers);
-    // dbg!(&self.data);
+        // dbg!(&self.headers);
+        // dbg!(&self.data);
 
-    // Write the headers
-    if !self.headers.is_empty() {
-        wtr.write_record(&self.headers)?;
-    }
-
-    // Ensure each data row has the same number of elements as there are headers
-    let headers_len = self.headers.len();
-    for record in &mut self.data {
-        // Pad the record with empty strings if it has fewer elements than headers
-        while record.len() < headers_len {
-            record.push("".to_string());
+        // Write the headers
+        if !self.headers.is_empty() {
+            wtr.write_record(&self.headers)?;
         }
 
-        // dbg!(&record, &new_file_path);
-        wtr.write_record(record)?;
+        // Ensure each data row has the same number of elements as there are headers
+        let headers_len = self.headers.len();
+        for record in &mut self.data {
+            // Pad the record with empty strings if it has fewer elements than headers
+            while record.len() < headers_len {
+                record.push("".to_string());
+            }
+
+            // dbg!(&record, &new_file_path);
+            wtr.write_record(record)?;
+        }
+
+        wtr.flush()?;
+
+        Ok(self)
     }
-
-    wtr.flush()?;
-
-    Ok(self)
-}
-
-
 
     /// Sets the CSV header using an array of strings.
     pub fn set_header(mut self, header: &[&str]) -> Self {
@@ -533,48 +527,45 @@ pub fn save_as(&mut self, new_file_path: &str) -> Result<&mut Self, Box<dyn Erro
         self
     }
 
-/// Adds column header
-pub fn add_column_header(&mut self, column_name: &str) -> &mut Self {
-    if self.error.is_none() {
-        self.headers.push(column_name.to_string());
-    }
-    self
-}
-
-/// Adds multiple column headers
-/*
-pub fn add_column_headers(mut self, column_names: Vec<&str>) -> Self {
-    if self.error.is_none() {
-        for &column_name in column_names.iter() {
+    /// Adds column header
+    pub fn add_column_header(&mut self, column_name: &str) -> &mut Self {
+        if self.error.is_none() {
             self.headers.push(column_name.to_string());
         }
+        self
     }
-    self
-}
-*/
 
-pub fn add_column_headers(&mut self, column_names: Vec<&str>) -> &mut Self {
-    // Check the state before adding new headers
-    //dbg!(&self.headers);
-    //dbg!(&self.data);
-
-    if self.error.is_none() {
-        for &column_name in column_names.iter() {
-            self.headers.push(column_name.to_string());
-            // Check the state after each header is added
-            // dbg!(&self.headers);
+    /// Adds multiple column headers
+    /*
+    pub fn add_column_headers(mut self, column_names: Vec<&str>) -> Self {
+        if self.error.is_none() {
+            for &column_name in column_names.iter() {
+                self.headers.push(column_name.to_string());
+            }
         }
+        self
     }
+    */
 
-    // Final state check after all headers are added
-    //dbg!(&self.headers);
-    //dbg!(&self.data);
+    pub fn add_column_headers(&mut self, column_names: Vec<&str>) -> &mut Self {
+        // Check the state before adding new headers
+        //dbg!(&self.headers);
+        //dbg!(&self.data);
 
-    self
-}
+        if self.error.is_none() {
+            for &column_name in column_names.iter() {
+                self.headers.push(column_name.to_string());
+                // Check the state after each header is added
+                // dbg!(&self.headers);
+            }
+        }
 
+        // Final state check after all headers are added
+        //dbg!(&self.headers);
+        //dbg!(&self.data);
 
-
+        self
+    }
 
     /// In CSV column order manipulation, the `...` symbol acts as a pivot point to specify
     /// where specified columns should be placed within the reordered column sequence.
@@ -839,35 +830,38 @@ pub fn add_column_headers(&mut self, column_names: Vec<&str>) -> &mut Self {
     }
 
     /// Sets a column's value based on a condition applied to a different column.
-pub fn where_set<T: CompareValue>(
-    &mut self,
-    filter_column_name: &str,
-    operation: &str,
-    value: T, // Value to check against in the filter column.
-    compare_as: &str,
-    set_column_name: &str,
-    set_value: &str, // Value to set in the target column.
-) -> &mut Self {
-    if let Some(filter_column_index) = self.headers.iter().position(|h| h == filter_column_name) {
-        if let Some(set_column_index) = self.headers.iter().position(|h| h == set_column_name) {
-            self.data.iter_mut().for_each(|row| {
-                if let Some(cell_value) = row.get(filter_column_index) {
-                    if value.apply(cell_value, operation, compare_as) {
-                        if let Some(target) = row.get_mut(set_column_index) {
-                            *target = set_value.to_string();
+    pub fn where_set<T: CompareValue>(
+        &mut self,
+        filter_column_name: &str,
+        operation: &str,
+        value: T, // Value to check against in the filter column.
+        compare_as: &str,
+        set_column_name: &str,
+        set_value: &str, // Value to set in the target column.
+    ) -> &mut Self {
+        if let Some(filter_column_index) = self.headers.iter().position(|h| h == filter_column_name)
+        {
+            if let Some(set_column_index) = self.headers.iter().position(|h| h == set_column_name) {
+                self.data.iter_mut().for_each(|row| {
+                    if let Some(cell_value) = row.get(filter_column_index) {
+                        if value.apply(cell_value, operation, compare_as) {
+                            if let Some(target) = row.get_mut(set_column_index) {
+                                *target = set_value.to_string();
+                            }
                         }
                     }
-                }
-            });
+                });
+            } else {
+                println!("Set column '{}' not found in headers.", set_column_name);
+            }
         } else {
-            println!("Set column '{}' not found in headers.", set_column_name);
+            println!(
+                "Filter column '{}' not found in headers.",
+                filter_column_name
+            );
         }
-    } else {
-        println!("Filter column '{}' not found in headers.", filter_column_name);
+        self
     }
-    self
-}
-
 
     /// Helper function to parse timestamps
     fn parse_timestamp(time_str: &str) -> Result<NaiveDateTime, String> {
@@ -913,32 +907,34 @@ pub fn where_set<T: CompareValue>(
     }
 
     /// Helper function to clean a string value (removes surrounding quotes)
-        fn clean_string_value(value: &str) -> String {
+    fn clean_string_value(value: &str) -> String {
         value.trim_matches('\"').to_string()
     }
 
-        /// Prints unique values for a specified column and returns self for chaining.
-pub fn print_unique(&mut self, column_name: &str) -> &mut Self {
-    if let Some(index) = self.headers.iter().position(|h| h == column_name) {
-        let mut unique_values: HashSet<String> = HashSet::new();
-        for row in &self.data {
-            if let Some(value) = row.get(index) {
-                unique_values.insert(Self::clean_string_value(value));
+    /// Prints unique values for a specified column and returns self for chaining.
+    pub fn print_unique(&mut self, column_name: &str) -> &mut Self {
+        if let Some(index) = self.headers.iter().position(|h| h == column_name) {
+            let mut unique_values: HashSet<String> = HashSet::new();
+            for row in &self.data {
+                if let Some(value) = row.get(index) {
+                    unique_values.insert(Self::clean_string_value(value));
+                }
             }
+            print!("Unique values in '{}': ", column_name);
+            for (i, value) in unique_values.iter().enumerate() {
+                if i > 0 {
+                    print!(", ");
+                }
+                print!("{}", value);
+            }
+            println!(); // Add a newline at the end
+        } else {
+            println!("Column '{}' not found", column_name);
         }
-        print!("Unique values in '{}': ", column_name);
-        for (i, value) in unique_values.iter().enumerate() {
-            if i > 0 { print!(", "); }
-            print!("{}", value);
-        }
-        println!(); // Add a newline at the end
-    } else {
-        println!("Column '{}' not found", column_name);
+        self
     }
-    self
-}
 
-    /// Returns unique values for a specified column as a Vec<String>, with cleaner values.
+    /// Returns unique values for a specified column as a `Vec<String>`, with cleaner values.
     pub fn get_unique(&mut self, column_name: &str) -> Vec<String> {
         let mut unique_values: HashSet<String> = HashSet::new();
         if let Some(index) = self.headers.iter().position(|h| h == column_name) {
@@ -950,20 +946,18 @@ pub fn print_unique(&mut self, column_name: &str) -> &mut Self {
         }
         unique_values.into_iter().collect()
     }
-
 }
 
 /// Represents a caching mechanism for CSV results, holding a data generator, cache path, and cache duration.
 pub struct CsvResultCacher {
-    data_generator: Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>>>> + Send + Sync>,
+    data_generator:
+        Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>>>> + Send + Sync>,
     cache_path: String, // Still using String here to store the path
     cache_duration: Duration,
 }
 
 impl CsvResultCacher {
-
-
-        pub fn get_docs() -> String {
+    pub fn get_docs() -> String {
         let docs = r#"
 
 +++++++++++++++++++++++++++++++++++
@@ -1027,11 +1021,13 @@ impl CsvResultCacher {
         docs.to_string()
     }
 
-
     /// Constructs a new `CsvResultCacher` with a specified data generator, cache path, and cache duration in minutes.
     pub fn new<F>(data_generator: F, cache_path: String, cache_duration_minutes: u64) -> Self
     where
-        F: Fn() -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>>>> + Send + Sync + 'static,
+        F: Fn() -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>>>>
+            + Send
+            + Sync
+            + 'static,
     {
         CsvResultCacher {
             data_generator: Box::new(data_generator),
@@ -1047,10 +1043,13 @@ impl CsvResultCacher {
         cache_duration_minutes: u64,
     ) -> Result<(), Box<dyn Error>>
     where
-        F: Fn() -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>>>> + Send + Sync + 'static,
+        F: Fn() -> Pin<Box<dyn Future<Output = Result<(), Box<dyn Error>>>>>
+            + Send
+            + Sync
+            + 'static,
     {
         let cacher = CsvResultCacher::new(
-            data_generator, 
+            data_generator,
             cache_path.to_string(), // Convert &str to String here
             cache_duration_minutes,
         );

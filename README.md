@@ -10,7 +10,7 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 ### `csv_utils`
 
 - **Purpose**: Gracefully build csv files.
-- **Features**: The CsvBuilder allows you to create CSV files with grace by chaining easy-to-read methods to set headers and add rows, where as the CsvResultCacher :.
+- **Features**: The CsvBuilder allows you to create CSV files with grace by chaining easy-to-read methods to set headers and add rows, where as the CsvResultCacher allows you to proxy cache the results of a .csv file generating function for future executions. The CsvConverter provides an elegant interface to convert various types of data strcutures, including json, to .csv.
 
 ### `df_utils`
 
@@ -30,172 +30,28 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 2. csv_utils
 ------------
 
-### CsvBuilder
+The `csv_utils` module encompasses a set of utilities designed to simplify various tasks associated with CSV files. These utilities include the `CsvBuilder` for creating and managing CSV files, the `CsvConverter` for transforming JSON data into CSV format, and the `CsvResultCacher` for efficient data caching and retrieval. Each utility is tailored to enhance productivity and ease in handling CSV data in different scenarios.
 
-The `CsvBuilder` in the `rgwml::csv_utils` module offers a fluent interface for creating, analyzing, and saving CSV files. It simplifies interactions with CSV data, whether starting from scratch, modifying existing files, or working with DataFrame structures.
+- CsvBuilder: Offers a fluent interface for creating, analyzing, and saving CSV files. It simplifies interactions with CSV data, whether starting from scratch, modifying existing files, or working with DataFrame structures.
 
-#### Instantiating a CsvBuilder Object
+- CsvConverter: Provides a method for converting JSON data into CSV format. This utility is particularly useful for processing and saving JSON API responses as CSV files, offering a straightforward approach to data conversion. The `CsvConverter` simplifies the process of converting JSON data into a CSV format. This is particularly useful for scenarios where data is received in JSON format from an API and needs to be transformed into a more accessible and readable CSV file. To use `CsvConverter`, simply call the `from_json` method with the JSON data and the desired output file path as arguments.
 
-Example 1: Creating a new object
+- CsvResultCacher: Uses a data generator function to create or fetch data, saves it to a specified path, and keeps it for a set duration. This helps avoid unnecessary data regeneration. Imagine you have a CSV file that logs daily temperatures. You don't want to generate this file every time you access it, especially if the data doesn't change much during the day. Here's how you can use CsvResultCacher:
 
-    use rgwml::csv_utils::CsvBuilder;
+Easily print example synatax relating to this feature in your workflow.
 
-    let builder = CsvBuilder::new()
-        .set_header(&["Column1", "Column2", "Column3"])
-        .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
-        .save_as("/path/to/your/file.csv");
-
-Example 2: Load from an existing file
-
-    use rgwml::csv_utils::CsvBuilder;
-
-    let builder = CsvBuilder::from_csv("/path/to/existing/file.csv");
-
-Example 3: Load from a DataFrame object
-
-    use rgwml::csv_utils::CsvBuilder;
-    use rgwml::df_utils::DataFrame;
-
-    let data_frame = // Initialize your DataFrame here
-    let builder = CsvBuilder::from_dataframe(data_frame)
-        .save_as("/path/to/your/file.csv"); 
-
-#### Manipulating a CsvBuilder Object for Analysis or Saving
-
-    use rgwml::csv_utils::CsvBuilder;
-
-    let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
-        .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
-        .drop_columns(vec!["UNUSED_COLUMN"])
-        .cascade_sort(vec![("COLUMN", "ASC")])
-        .where_("address","FUZZ_MIN_SCORE_70",vec!["new delhi","jerusalem"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
-        .print_row_count()
-        .save_as("/path/to/modified/file.csv");
-
-#### Discovering Chainable Options
-
-    let builder = CsvBuilder::new()
-        .get_options(); // Outputs available options and their syntax
-
-Chainable Options in `CsvBuilder`
-
-- **`.save_as(path: &str)`**: Saves the current state of the CSV to a specified file path.
-
-- **`.set_header(columns: &[&str])`**: Sets the header (column names) of the CSV file. Typically used with new CSV files.
-
-- **`.add_row(row: &[&str])`**: Adds a single row to the CSV file.
-
-- **`.add_rows(rows: &[&[&str]])`**: Adds multiple rows to the CSV file.
-
-- **`.order_columns(order: Vec<&str>)`**: Orders columns in the specified sequence. The '...' syntax can be used to keep remaining columns in their original order.
-
-- **`.print_columns()`**: Prints the names of the columns in the CSV file.
-
-- **`.print_row_count()`**: Prints the total number of rows in the CSV file.
-
-- **`.print_first_row()`**: Prints the first row of the CSV file in a JSON-like format.
-
-- **`.print_last_row()`**: Prints the last row of the CSV file in a JSON-like format.
-
-- **`.print_rows_range(start: usize, end: usize)`**: Prints a range of rows, specified by start and end indices.
-
-- **`.print_rows()`**: Prints all rows in the CSV file in a JSON-like format.
-
-- **`.cascade_sort(sort_order: Vec<(&str, &str)>)`**: Sorts the data in the CSV file based on specified columns and sort orders (ASC/DESC).
-
-- **`.drop_columns(columns: Vec<&str>)`**: Removes specified columns from the CSV file.
-
-- **`.rename_columns(rename_map: Vec<(&str, &str)>)`**: Renames columns as specified in the provided mapping.
-
-- **`.where_(column: &str, operator: &str, value: T, comparison_type: &str)`**: Filters rows based on a condition, supporting text, numeric, and timestamp comparisons. The value parameter accepts any type T that implements the CompareValue trait, allowing for flexible comparisons.
-
-- **`.limit(limit: usize)`**: Limits the number of rows to be included in the CSV file. If the current number of rows exceeds this limit, the excess rows are truncated.
-
-### CsvConverter
-
-The `CsvConverter` struct in the `rgwml::csv_utils` module provides a method for converting JSON data into CSV format. This utility is particularly useful for processing and saving JSON API responses as CSV files, offering a straightforward approach to data conversion. The `CsvConverter` simplifies the process of converting JSON data into a CSV format. This is particularly useful for scenarios where data is received in JSON format from an API and needs to be transformed into a more accessible and readable CSV file. To use `CsvConverter`, simply call the `from_json` method with the JSON data and the desired output file path as arguments.
-
-Example:
-
-    use tokio;
-    use rgwml::csv_utils::CsvConverter;
-
-    async fn fetch_sales_data_from_api() -> Result<String, Box<dyn std::error::Error>> {
-        let method = "POST";
-        let url = "http://example.com/api/sales"; // API URL to fetch sales data
-
-        let payload = json!({
-            "date": "2023-12-21"
-        });
-
-        let response = ApiCallBuilder::call(method, url, None, Some(payload))
-            .execute()
-            .await?;
-
-        Ok(response)
-    }
+    use rgwml::csv_utils::{CsvBuilder, CsvConverter, CsvResultCacher};
+    use std::collections::HashMap;
 
     #[tokio::main]
     async fn main() {
-        let sales_data_response = fetch_sales_data_from_api().await?;
-        CsvConverter::from_json(sales_data_response, "path/to/your/file.csv")
-            .expect("Failed to convert JSON to CSV");
+
+        let _ = CsvBuilder::get_docs();
+        let _ = CsvConverter::get_docs();
+        let _ = CsvResultCacher::get_docs();
+        std::process::exit(1);
+
     }
-
-### CsvResultCacher
-
-CsvResultCacher in rgwml::csv_utils is a tool for caching CSV data. It uses a data generator function to create or fetch data, saves it to a specified path, and keeps it for a set duration. This helps avoid unnecessary data regeneration. Imagine you have a CSV file that logs daily temperatures. You don't want to generate this file every time you access it, especially if the data doesn't change much during the day. Here's how you can use CsvResultCacher:
-
-    use rgwml::api_utils::ApiCallBuilder;
-    use rgwml::csv_utils::{CsvBuilder, CsvResultCacher};
-    use serde_json::json;
-    use tokio;
-
-    async fn generate_daily_sales_report() -> Result<(), Box<dyn std::error::Error>> {
-        async fn fetch_sales_data_from_api() -> Result<String, Box<dyn std::error::Error>> {
-            let method = "POST";
-            let url = "http://example.com/api/sales"; // API URL to fetch sales data
-
-            let payload = json!({
-                "date": "2023-12-21"
-            });
-
-            let response = ApiCallBuilder::call(method, url, None, Some(payload))
-                .execute()
-                .await?;
-
-            Ok(response)
-        }
-
-        let sales_data_response = fetch_sales_data_from_api().await?;
-
-        // Convert the JSON response to CSV format using CsvBuilder
-        let csv_builder = CsvBuilder::from_api_call(sales_data_response)
-            .await
-            .unwrap()
-            .save_as("/path/to/daily_sales_report.csv");
-        
-        Ok(())
-    }
-
-    #[tokio::main]
-    async fn main() {
-        let cache_path = "/path/to/daily_sales_report.csv";
-        let cache_duration_minutes = 1440; // Cache duration set to 1 day
-
-        let result = CsvResultCacher::fetch_async(
-            || Box::pin(generate_daily_sales_report()),
-            cache_path,
-            cache_duration_minutes,
-        ).await;
-
-        match result {
-            Ok(_) => println!("Sales report is ready."),
-            Err(e) => eprintln!("Failed to generate sales report: {}", e),
-        }
-    }
-
-
 
 3. df_utils
 -----------
@@ -318,9 +174,9 @@ Usage
 
 To make the most of the `DataFrameCacher`, follow these steps:
 
-1. **Create a data generator function**: Begin by creating a data generator function that returns a `Future` producing a `Result<DataFrame, Box<dyn Error>>`. This function will be responsible for generating the data you want to cache.
+- **Create a data generator function**: Begin by creating a data generator function that returns a `Future` producing a `Result<DataFrame, Box<dyn Error>>`. This function will be responsible for generating the data you want to cache.
 
-2. **Instantiate a `DataFrameCacher` with the `fetch_async` method**: Once you have your data generator function, you can create an instance of `DataFrameCacher` by providing the data generator function, cache path, and cache duration. If the data is still valid in the cache, it will be retrieved from there. Otherwise, the data generator function will be invoked to obtain fresh data, which will then be cached for future use.
+- **Instantiate a `DataFrameCacher` with the `fetch_async` method**: Once you have your data generator function, you can create an instance of `DataFrameCacher` by providing the data generator function, cache path, and cache duration. If the data is still valid in the cache, it will be retrieved from there. Otherwise, the data generator function will be invoked to obtain fresh data, which will then be cached for future use.
 
 Example
 
@@ -354,64 +210,39 @@ Note: The use of `|| Box` in the example is essential. It allows you to encapsul
 4. ai_utils
 -----------
 
-Provides simple AI utilities for neural association analysis. It offers tools to process and analyze data in the context of neural networks, with a focus on understanding decision-making processes and text analysis in a parallel computing environment.
+This library provides simple AI utilities for neural association analysis. It focuses on processing and analyzing data within neural networks, with an emphasis on understanding AI decision-making processes and text analysis, optimized for a parallel computing environment.
 
 Features
 
-- **Convert DataFrames**: Transform your data into a format suitable for neural association analysis.
-- **Parallel Processing**: Analyze neural associations in parallel, revealing insights into AI decision-making.
-
-Usage
-
-First, convert your data into a suitable `DataFrame` format. Then, analyze the data using `fuzzai` for concurrent neural association analysis.
+- **Direct CSV Input**: Utilize CSV file paths directly, specifying input and output column names, to facilitate neural association analysis.
+- **Parallel Processing**: Leverage parallel computing to efficiently analyze neural associations, gaining insights into AI decision-making processes.
 
 Example
 
-
-    use rgwml::ai_utils::{NeuralAssociations2DDataFrameConfig, create_neural_associations_2d_df, fuzzai, SplitUpto, ShowComplications, WordLengthSensitivity};
-    use rgwml::df_utils::DataFrame;
-    use std::collections::HashMap;
-    use serde_json::Value;
+    use rgwml::ai_utils::{fuzzai, SplitUpto, ShowComplications, WordLengthSensitivity};
+    use std::error::Error;
 
     #[tokio::main]
     async fn main() {
-        // Prepare the raw data
-        let mut data_frame = Vec::new();
-        let mut record = HashMap::new();
-        record.insert("address".to_string(), Value::String("123 Main St".to_string()));
-        record.insert("name".to_string(), Value::String("John Doe".to_string()));
-        data_frame.push(record);
-
-        // Configure and convert the DataFrame
-        let config = NeuralAssociations2DDataFrameConfig {
-            input_column: "address",
-            output_column: "name",
-        };
-    
-        let neural_association_df = create_neural_associations_2d_df(data_frame, config);
-
-        // Analyze using fuzzai
-        let text_in_focus = "123 Main St";
-        let task_name = "Address Analysis";
-        let result = fuzzai(
-            neural_association_df,
-            text_in_focus,
-            task_name,
+        // Call the fuzzai function with CSV file path
+        let fuzzai_result = fuzzai(
+            "path/to/your/csv/file.csv",
+            "input_column_name",
+            "output_column_name",
+            "your text to be analyzed against the training data",
+            "fuzzai_analysis",
             SplitUpto::WordSetLength(2),
             ShowComplications::False,
-         WordLengthSensitivity::Coefficient(0.2)
-     ).await.expect("Analysis should succeed");
+            WordLengthSensitivity::Coefficient(0.2),
+        ).await.expect("Analysis should succeed");
 
-     dbg!(result);
-}
-
-
-This integrated example demonstrates the full process of data transformation and analysis, highlighting the capabilities of the `rgwml` library in neural association studies. This library is perfect for applications where AI's interpretation of data patterns and decision-making processes are crucial.
+        dbg!(fuzzai_result);
+    }
 
 5. api_utils
 ------------
 
-This module features the APICallBuilder a fluent interface to build API requests with support for method chaining. It simplifies the process by allowing you to specify both headers and payload as `serde_json::Value`. This approach is convenient when dealing with JSON data, making it easy to construct requests dynamically. If caching is enabled, responses are stored and reused for subsequent requests made within the specified cache duration.
+Easily print example synatax relating to this feature in your workflow.
 
     use serde_json::json;
     use rgwml::api_utils::ApiCallBuilder;
@@ -419,81 +250,11 @@ This module features the APICallBuilder a fluent interface to build API requests
 
     #[tokio::main]
     async fn main() {
-        let result = fetch_and_cache_post_request().await;
-        match result {
-            Ok(response) => println!("Response: {:?}", response),
-            Err(e) => eprintln!("Failed to fetch data: {}", e),
-        }
 
-        let result_with_headers = fetch_and_cache_post_request_with_headers().await;
-        match result_with_headers {
-            Ok(response) => println!("Response with headers: {:?}", response),
-            Err(e) => eprintln!("Failed to fetch data with headers: {}", e),
-        }
+        let _ = ApiCallBuilder::get_docs();
+        std::process::exit(1);
 
-        let result_form_urlencoded = fetch_and_cache_post_request_form_urlencoded().await;
-        match result_form_urlencoded {
-            Ok(response) => println!("Form URL encoded response: {:?}", response),
-            Err(e) => eprintln!("Failed to fetch form URL encoded data: {}", e),
-        }
     }
-
-    // Example 1: Without Headers
-    async fn fetch_and_cache_post_request() -> Result<String, Box<dyn std::error::Error>> {
-        let method = "POST";
-        let url = "http://example.com/api/submit";
-        let payload = json!({
-            "field1": "Hello",
-            "field2": 123
-        });
-
-        ApiCallBuilder::call(method, url, None, Some(payload))
-            .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
-            .execute()
-            .await
-    }
-
-    // Example 2: With Headers
-    async fn fetch_and_cache_post_request_with_headers() -> Result<String, Box<dyn std::error::Error>> {
-        let method = "POST";
-        let url = "http://example.com/api/submit";
-        let headers = json!({
-            "Content-Type": "application/json",
-            "Authorization": "Bearer your_token_here"
-        });
-        let payload = json!({
-            "field1": "Hello",
-            "field2": 123
-        });
-
-        ApiCallBuilder::call(method, url, Some(headers), Some(payload))
-            .maintain_cache(30, "/path/to/post_with_headers_cache.json") // Uses cache for 30 minutes
-            .execute()
-            .await
-    }
-
-    // Example 3: With application/x-www-form-urlencoded Content-Type
-    async fn fetch_and_cache_post_request_form_urlencoded() -> Result<String, Box<dyn std::error::Error>> {
-        let method = "POST";
-        let url = "http://example.com/api/submit";
-        let headers = json!({
-            "Content-Type": "application/x-www-form-urlencoded"
-        });
-        let payload = HashMap::from([
-            ("field1", "value1"),
-            ("field2", "value2"),
-        ]);
-
-        ApiCallBuilder::call(method, url, Some(headers), Some(payload))
-            .maintain_cache(30, "/path/to/post_form_urlencoded_cache.json") // Uses cache for 30 minutes
-            .execute()
-            .await
-    }
-
-
-These examples demonstrate how to use the ApiCallBuilder with and without custom headers. Since the headers and payload are specified as `serde_json::Value`, it offers flexibility in constructing various types of requests.
-
-Note: Be cautious when caching POST requests, as they typically send unique data each time. Caching is most effective when the same request is likely to yield the same response.
 
 6. License
 ----------

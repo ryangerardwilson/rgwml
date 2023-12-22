@@ -14,110 +14,6 @@ use std::str::FromStr;
 /// chaining. It simplifies the process by allowing you to specify both headers and payload
 /// as `serde_json::Value`. This approach is convenient when dealing with JSON data,
 /// making it easy to construct requests dynamically.
-///
-/// If caching is enabled, responses are stored and reused for subsequent requests made
-/// within the specified cache duration.
-///
-/// Example 1: Without Headers
-/// ```
-/// use serde_json::json;
-/// use rgwml::api_utils::ApiCallBuilder;
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let method = "POST"; // Or "GET"
-///     let url = "http://example.com/api/submit";
-///     let payload = json!({
-///         "field1": "Hello",
-///         "field2": 123
-///     });
-///     let response = ApiCallBuilder::call(
-///             method,            
-///             url,
-///             None, // No custom headers
-///             Some(payload)
-///         )
-///         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
-///         .execute()
-///         .await
-///         .unwrap();
-///
-///     dbg!(response);
-/// }
-/// ```
-///
-/// Example 2: With Headers
-/// ```
-/// use serde_json::json;
-/// use rgwml::api_utils::ApiCallBuilder;
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let method = "POST"; // Or "GET"
-///     let url = "http://example.com/api/submit";
-///     let headers = json!({
-///         "Content-Type": "application/json",
-///         "Authorization": "Bearer your_token_here"
-///     });
-///     let payload = json!({
-///         "field1": "Hello",
-///         "field2": 123
-///     });
-///     let response = ApiCallBuilder::call(
-///             method,
-///             url,
-///             Some(headers), // Custom headers
-///             Some(payload)
-///         )
-///         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
-///         .execute()
-///         .await
-///         .unwrap();
-///
-///     dbg!(response);
-/// }
-/// ```
-/// Example 3: With application/x-www-form-urlencoded Content-Type
-/// ```
-/// use serde_json::json;
-/// use rgwml::api_utils::ApiCallBuilder;
-/// use std::collections::HashMap;
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let method = "POST"; // Or "GET"
-///     let url = "http://example.com/api/submit";
-///     let headers = json!({
-///         "Content-Type": "application/x-www-form-urlencoded"
-///     });
-///     let payload = json!({
-///         "field1": "value1",
-///         "field2": "value2"
-///     });
-///     let response = ApiCallBuilder::call(
-///             method,            
-///             url,
-///             Some(headers),
-///             Some(payload) // Payload as form data
-///         )
-///         .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
-///         .execute()
-///         .await
-///         .unwrap();
-///
-///     dbg!(response);
-/// }
-/// ```
-///
-/// These examples demonstrate how to use the ApiCallBuilder with and without custom headers.
-/// Since the headers and payload are specified as `serde_json::Value`, it offers flexibility in
-/// constructing various types of requests.
-///
-/// # Note
-///
-/// Be cautious when caching POST requests, as they typically send unique data each time.
-/// Caching is most effective when the same request is likely to yield the same response.
-
 pub struct ApiCallBuilder {
     method: String,
     url: String,
@@ -128,8 +24,7 @@ pub struct ApiCallBuilder {
 }
 
 impl ApiCallBuilder {
-
-        pub fn get_docs() -> String {
+    pub fn get_docs() -> String {
         let docs = r#"
 
 ++++++++++++++++++++++++++++++++
@@ -229,8 +124,6 @@ impl ApiCallBuilder {
 
         docs.to_string()
     }
-
-
 
     pub fn call(
         method: &str,

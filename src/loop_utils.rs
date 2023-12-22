@@ -4,8 +4,7 @@ use std::future::Future;
 pub struct FutureLoop;
 
 impl FutureLoop {
-
-        pub fn get_docs() -> String {
+    pub fn get_docs() -> String {
         let docs = r#"
 
 ++++++++++++++++
@@ -44,5 +43,3 @@ impl FutureLoop {
         join_all(futures).await
     }
 }
-
-
