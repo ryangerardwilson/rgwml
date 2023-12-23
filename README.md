@@ -21,9 +21,6 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
   - **CsvResultCacher**: Cache results of CSV operations, enhancing performance for repetitive tasks.
   - **CsvConverter**: Seamlessly convert various data formats like JSON into CSV, expanding the utility of your data.
 
-  - **CsvResultCacher**: Cache the results of CSV file generation for future use.
-  - **CsvConverter**: Convert various data structures, like JSON, into CSV format.
-
 ## `ai_utils`
 
 - **Purpose**: Leverage Rust's concurrency for AI/Graph Theory-based analysis.

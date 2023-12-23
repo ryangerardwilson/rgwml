@@ -1,5 +1,4 @@
 //ai_utils.rs
-use crate::df_utils::DataFrame;
 use futures::future::join_all;
 use fuzzywuzzy::fuzz;
 use regex::Regex;
@@ -10,8 +9,6 @@ use std::error::Error;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-
-//pub type DataFrame = Vec<HashMap<String, Value>>;
 
 /// The `NeuralAssociations2D` struct represents a basic structure for a two-dimensional neural network model.
 /// It consists of two primary fields: `input` and `output`. These fields are designed to work with string representations
@@ -377,66 +374,4 @@ pub struct NeuralAssociations2DDataFrameConfig {
     pub output_column: &'static str,
 }
 
-/// Converts a given DataFrame to a `NeuralAssociations2D` DataFrame.
-///
-/// This function takes a DataFrame and a `NeuralAssociations2DDataFrameConfig`,
-/// and creates a new DataFrame where each record is a HashMap representing a `NeuralAssociations2D` object.
-/// The `input` and `output` fields of each object are filled based on the specified columns
-/// in the original DataFrame.
-///
-/// # Arguments
-/// * `data_frame` - The original DataFrame to convert.
-/// * `config` - Configuration specifying which columns to map to `input` and `output`.
-///
-/// # Returns
-/// A new DataFrame where each record represents a `NeuralAssociations2D` object.
-///
-/// # Example
-///
-/// ```
-/// use rgwml::df_utils::DataFrame;
-/// use rgwml::ai_utils::{NeuralAssociations2DDataFrameConfig, create_neural_associations_2d_df}
-///
-/// let mut data_frame = Vec::new();
-/// let mut record = HashMap::new();
-/// record.insert("address".to_string(), Value::String("123 Main St".to_string()));
-/// record.insert("name".to_string(), Value::String("John Doe".to_string()));
-/// data_frame.push(record);
-///
-/// let config = NeuralAssociations2DDataFrameConfig {
-///     input_column: "address",
-///     output_column: "name",
-/// };
-///
-/// let neural_association_df = create_neural_associations_2d_df(data_frame, config);
-/// ```
-pub fn create_neural_associations_2d_df(
-    data_frame: DataFrame,
-    config: NeuralAssociations2DDataFrameConfig,
-) -> DataFrame {
-    let mut neural_association_df = Vec::new();
 
-    for record in data_frame.iter() {
-        let input_column = config.input_column.to_string();
-        let output_column = config.output_column.to_string();
-
-        let input_value = record
-            .get(&input_column)
-            .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .to_string();
-
-        let output_value = record
-            .get(&output_column)
-            .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .to_string();
-
-        let mut new_row = HashMap::new();
-        new_row.insert("input".to_string(), Value::String(input_value));
-        new_row.insert("output".to_string(), Value::String(output_value));
-        neural_association_df.push(new_row);
-    }
-
-    neural_association_df
-}
