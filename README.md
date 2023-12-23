@@ -241,14 +241,14 @@ Example
     async fn main() {
         // Call the fuzzai function with CSV file path
         let fuzzai_result = fuzzai(
-            "path/to/your/csv/file.csv",
-            "input_column_name",
-            "output_column_name",
-            "your text to be analyzed against the training data",
-            "fuzzai_analysis",
-            SplitUpto::WordSetLength(2),
-            ShowComplications::False,
-            WordLengthSensitivity::Coefficient(0.2),
+            "path/to/your/model/training/csv/file.csv",
+            "model_training_input_column_name",
+            "model_training_output_column_name",
+            "your text to be analyzed against the training data model",
+            "your task description: clustering customer complaints",
+            SplitUpto::WordSetLength(2), // Set the minimum word length of combination value to split the training input data during the analysis
+            ShowComplications::False, // Set to True to see inner workings of the model
+            WordLengthSensitivity::Coefficient(0.2), // Set to Coefficient::None to disregard differences in the word length of the training input and the text being analyzed; Increase the coefficient to give higher weightage to matches with similar word length
         ).await.expect("Analysis should succeed");
 
         dbg!(fuzzai_result);
