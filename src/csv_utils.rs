@@ -1,5 +1,4 @@
 // csv_utils.rs
-use crate::df_utils::DataFrame;
 use chrono::{DateTime, NaiveDateTime};
 use csv::Writer;
 use futures::executor::block_on;
@@ -227,7 +226,7 @@ impl CsvBuilder {
 ++++++++++++++++++++++++++++++
 
 1. Instantiation
--------------
+----------------
 
 Example 1: Creating a new object
 
@@ -244,15 +243,6 @@ Example 2: Load from an existing file
 
     let builder = CsvBuilder::from_csv("/path/to/existing/file.csv");
 
-Example 3: Load from a DataFrame object
-
-    use rgwml::csv_utils::CsvBuilder;
-    use rgwml::df_utils::DataFrame;
-
-    let data_frame = // Initialize your DataFrame here
-    let builder = CsvBuilder::from_dataframe(data_frame)
-        .save_as("/path/to/your/file.csv");
-
 2. Manipulating a CsvBuilder Object for Analysis or Saving
 ----------------------------------------------------------
 
@@ -266,31 +256,22 @@ Example 3: Load from a DataFrame object
         .print_row_count()
         .save_as("/path/to/modified/file.csv");
 
-3. Discovering Chainable Options
---------------------------------
+3. Chainable Options
+--------------------
 
-    let builder = CsvBuilder::new()
-        .get_options(); // Outputs available options and their syntax
-
-### List of Flexibly Chainable Methods
-
-    .save_as("/path/to/your/file.csv")
-    .set_header(&["Column1", "Column2", "Column3"]) // Only on CsvBuilder::new() instantiations
-    .add_row(&["Row1-1", "Row1-2", "Row1-3"])
-    .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
+    CsvBuilder::from_csv("/path/to/your/file1.csv")
+    .set_header(vec!["Header1", "Header2", "Header3"])
+    .add_column_header("NewColumn1")
+    .add_column_headers(vec!["NewColumn2", "NewColumn3"])
     .order_columns(vec!["Column1", "...", "Column5", "Column2"])
     .order_columns(vec!["...", "Column5", "Column2"])
     .order_columns(vec!["Column1", "Column5", "..."])
-    .print_columns()
-    .print_row_count()
-    .print_first_row()
-    .print_last_row()
-    .print_rows_range(2,5)
-    .print_rows()
-    .print_unique("column_name")
-    .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
     .drop_columns(vec!["Column1", "Column3"])
     .rename_columns(vec![("Column1", "NewColumn1"), ("Column3", "NewColumn3")])
+    .add_row(vec!["Row1-1", "Row1-2", "Row1-3"])
+    .add_rows(vec![vec!["Row1-1", "Row1-2", "Row1-3"], vec!["Row2-1", "Row2-2", "Row2-3"]])
+    .limit(10)
+    .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
     .where_("column1", "==", "42", "COMPARE_AS_NUMBERS")
     .where_("column1", "==", "hello", "COMPARE_AS_TEXT"),
     .where_("column1", "CONTAINS", "apples", "COMPARE_AS_TEXT")
@@ -299,12 +280,21 @@ Example 3: Load from a DataFrame object
     .where_("stated_locality_address","FUZZ_MIN_SCORE_90",vec!["Shastri park","kamal nagar"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
     .where_("column1", ">", "23-01-01", "COMPARE_AS_TIMESTAMPS")
     .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting"), // Sets column 9's value to "greeting", where the condition is met. This syntax applies analogously to other where_ clauses as well
-    .limit(10)
-    .add_column_header("NewColumn1")
-    .add_column_headers(vec!["NewColumn2", "NewColumn3"])
+    .print_columns()
+    .print_row_count()
+    .print_first_row()
+    .print_last_row()
+    .print_rows_range(2,5)
+    .print_rows()
+    .print_unique("column_name")
+    .save_as("/path/to/your/file2.csv")
 
-### List of Chainable Methods that Can't Be Subsequently Chained
+4. Extract a Vector `Vec<String>` List
+--------------------------------------
 
+These methods return a list, and hence, can not be subsequently chained.
+
+    CsvBuilder::from_csv("/path/to/your/file1.csv")
     .get_unique("column_name") // Returns a Vec<String>
 
 "#;
@@ -315,58 +305,6 @@ Example 3: Load from a DataFrame object
         docs.to_string()
     }
 
-    pub fn get_options(&mut self) -> &mut Self {
-        let docs = r#"
-
-++++++++++++++++++++++++
-+> CsvBuilder Options <+
-++++++++++++++++++++++++
-
-List of Flexibly Chainable Methods
-----------------------------------
-    
-    .save_as("/path/to/your/file.csv")
-    .set_header(&["Column1", "Column2", "Column3"]) // Only on CsvBuilder::new() instantiations
-    .add_row(&["Row1-1", "Row1-2", "Row1-3"])
-    .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
-    .order_columns(vec!["Column1", "...", "Column5", "Column2"])
-    .order_columns(vec!["...", "Column5", "Column2"])
-    .order_columns(vec!["Column1", "Column5", "..."])
-    .print_columns()
-    .print_row_count()
-    .print_first_row()
-    .print_last_row()
-    .print_rows_range(2,5)
-    .print_rows()
-    .print_unique("column_name")
-    .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
-    .drop_columns(vec!["Column1", "Column3"])
-    .rename_columns(vec![("Column1", "NewColumn1"), ("Column3", "NewColumn3")])
-    .where_("column1", "==", "42", "COMPARE_AS_NUMBERS")
-    .where_("column1", "==", "hello", "COMPARE_AS_TEXT"),
-    .where_("column1", "CONTAINS", "apples", "COMPARE_AS_TEXT")
-    .where_("column1", "DOES_NOT_CONTAIN", "apples", "COMPARE_AS_TEXT")
-    .where_("column1", "STARTS_WITH", "discounted", "COMPARE_AS_TEXT")
-    .where_("stated_locality_address","FUZZ_MIN_SCORE_90",vec!["Shastri park","kamal nagar"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
-    .where_("column1", ">", "23-01-01", "COMPARE_AS_TIMESTAMPS")
-    .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting"), // Sets column 9's value to "greeting", where the condition is met. This syntax applies analogously to other where_ clauses as well
-    .limit(10)
-    .add_column_header("NewColumn1")
-    .add_column_headers(vec!["NewColumn2", "NewColumn3"])
-
-
-List of Chainable Methods that Can't Be Subsequently Chained
-------------------------------------------------------------
-
-    .get_unique("column_name") // Returns a Vec<String>
-
-
-        "#;
-
-        println!("{}", docs.to_string());
-
-        self
-    }
 
     /// Creates a new `CsvBuilder` instance with empty headers and data.
     ///
@@ -432,42 +370,6 @@ List of Chainable Methods that Can't Be Subsequently Chained
         builder
     }
 
-    /// Creates a `CsvBuilder` from a DataFrame, extracting headers and data.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rgwml::csv_utils::CsvBuilder;
-    /// use rgwml::df_utils::DataFrame; // Replace with actual DataFrame type
-    ///
-    /// let data_frame = // Your DataFrame initialization here
-    /// let builder = CsvBuilder::from_dataframe(data_frame)
-    ///     .add_row(&["Row1-1", "Row1-2", "Row1-3"])
-    ///     .add_rows(&[&["Row2-1", "Row2-2", "Row2-3"], &["Row3-1", "Row3-2", "Row3-3"]])
-    ///     .save_as("/path/to/your/file.csv");
-    /// ```
-    pub fn from_dataframe(data_frame: DataFrame) -> Self {
-        let mut builder = CsvBuilder::new();
-
-        if let Some(first_record) = data_frame.first() {
-            // Extract headers in the order they appear in the first record
-            let headers: Vec<String> = first_record.keys().cloned().collect();
-            builder.headers = headers.clone(); // Store headers separately
-
-            // Iterate over records to create data rows
-            for record in data_frame {
-                let mut row = Vec::new();
-                for header in &headers {
-                    let value = record.get(header).map_or("".to_string(), |v| v.to_string());
-                    row.push(value);
-                }
-                builder.data.push(row); // Add row to data
-            }
-        }
-
-        builder
-    }
-
     /// Saves data in the `CsvBuilder` to a new CSV file at `new_file_path`.
     pub fn save_as(&mut self, new_file_path: &str) -> Result<&mut Self, Box<dyn Error>> {
         let file = File::create(new_file_path)?;
@@ -499,28 +401,28 @@ List of Chainable Methods that Can't Be Subsequently Chained
     }
 
     /// Sets the CSV header using an array of strings.
-    pub fn set_header(mut self, header: &[&str]) -> Self {
+    pub fn set_header(&mut self, header: Vec<&str>) -> &mut Self {
         if self.error.is_none() {
-            let header_row = header.iter().map(|s| s.to_string()).collect();
+            let header_row = header.into_iter().map(|s| s.to_string()).collect();
             self.data.insert(0, header_row);
         }
         self
     }
 
     /// Adds a data row to the CSV.
-    pub fn add_row(mut self, row: &[&str]) -> Self {
+    pub fn add_row(&mut self, row: Vec<&str>) -> &mut Self {
         if self.error.is_none() {
-            let row_vec = row.iter().map(|s| s.to_string()).collect();
+            let row_vec = row.into_iter().map(|s| s.to_string()).collect();
             self.data.push(row_vec);
         }
         self
     }
 
     /// Adds multiple data rows to the CSV.
-    pub fn add_rows(mut self, rows: &[&[&str]]) -> Self {
+    pub fn add_rows(&mut self, rows: Vec<Vec<&str>>) -> &mut Self {
         if self.error.is_none() {
             for row in rows {
-                let row_vec = row.iter().map(|s| s.to_string()).collect();
+                let row_vec = row.into_iter().map(|s| s.to_string()).collect();
                 self.data.push(row_vec);
             }
         }
@@ -536,33 +438,13 @@ List of Chainable Methods that Can't Be Subsequently Chained
     }
 
     /// Adds multiple column headers
-    /*
-    pub fn add_column_headers(mut self, column_names: Vec<&str>) -> Self {
-        if self.error.is_none() {
-            for &column_name in column_names.iter() {
-                self.headers.push(column_name.to_string());
-            }
-        }
-        self
-    }
-    */
-
     pub fn add_column_headers(&mut self, column_names: Vec<&str>) -> &mut Self {
-        // Check the state before adding new headers
-        //dbg!(&self.headers);
-        //dbg!(&self.data);
 
         if self.error.is_none() {
             for &column_name in column_names.iter() {
                 self.headers.push(column_name.to_string());
-                // Check the state after each header is added
-                // dbg!(&self.headers);
             }
         }
-
-        // Final state check after all headers are added
-        //dbg!(&self.headers);
-        //dbg!(&self.data);
 
         self
     }
