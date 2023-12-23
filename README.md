@@ -9,9 +9,18 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 
 ## `csv_utils`
 
-- **Purpose**: Gracefully build CSV files.
-- **Features**: 
-  - **CsvBuilder**: Create CSV files easily with methods for setting headers and adding rows.
+- **Purpose**: A Comprehensive Toolkit for CSV File Management, in AI/ML pipelines.
+- **Features**: `csv_utils` offers a powerful suite of tools designed for efficient and flexible handling of CSV files. Key components include:
+  - **CsvBuilder**: A versatile builder for creating and manipulating CSV files, facilitating:
+    - **Easy Initialization**: Start with a new CSV or load from an existing file.
+    - **Custom Headers and Rows**: Set custom headers and add rows effortlessly.
+    - **Advanced Data Manipulation**: Rename, drop, and reorder columns, sort data, and apply complex filters like fuzzy matching and timestamp comparisons.
+    - **Chainable Methods**: Combine multiple operations in a fluent and readable manner.
+    - **Data Analysis Aids**: Count rows, print specific rows, ranges, or unique values for quick analysis.
+    - **Flexible Saving Options**: Save your modified CSV to a desired path.
+  - **CsvResultCacher**: Cache results of CSV operations, enhancing performance for repetitive tasks.
+  - **CsvConverter**: Seamlessly convert various data formats like JSON into CSV, expanding the utility of your data.
+
   - **CsvResultCacher**: Cache the results of CSV file generation for future use.
   - **CsvConverter**: Convert various data structures, like JSON, into CSV format.
 

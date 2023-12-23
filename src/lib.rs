@@ -5,26 +5,32 @@
 //!
 //! ## Modules Overview
 //!
-//! ## `csv_utils`
-//! - **Purpose**: Gracefully build CSV files.
-//! - **Features**:
-//!   - **CsvBuilder**: Create CSV files easily with methods for setting headers and adding rows.
-//!   - **CsvResultCacher**: Cache the results of CSV file generation for future use.
-//!   - **CsvConverter**: Convert various data structures, like JSON, into CSV format.
+//! ### `csv_utils`
+//!   - **Purpose**: A Comprehensive Toolkit for CSV File Management, in AI/ML pipelines. 
+//!   - **Features**: `csv_utils` offers a powerful suite of tools designed for efficient and flexible handling of CSV files. Key components include: 
+//!     - **CsvBuilder**: A versatile builder for creating and manipulating CSV files, facilitating:- 
+//!       - **Easy Initialization**: Start with a new CSV or load from an existing file.
+//!       - **Custom Headers and Rows**: Set custom headers and add rows effortlessly.
+//!       - **Advanced Data Manipulation**: Rename, drop, and reorder columns, sort data, and apply complex filters like fuzzy matching and timestamp comparisons.
+//!       - **Chainable Methods**: Combine multiple operations in a fluent and readable manner.
+//!       - **Data Analysis Aids**: Count rows, print specific rows, ranges, or unique values for quick analysis.
+//!       - **Flexible Saving Options**: Save your modified CSV to a desired path.
+//!     - **CsvResultCacher**: Cache the results of CSV file generation for future use.
+//!     - **CsvConverter**: Convert various data structures, like JSON, into CSV format.
 //!
-//! ## `ai_utils`
+//! ### `ai_utils`
 //! - **Purpose**: Leverage Rust's concurrency for AI/Graph Theory-based analysis.
 //! - **Features**:
 //!   - Conduct complex data analyses and process neural networks in parallel.
 //!   - Utilize Rust's performance and safety features.
 //!   - Work directly with CSV files, with an elegant syntax, for model training.
 //!
-//! ## `api_utils`
+//! ### `api_utils`
 //! - **Purpose**: Gracefully make and cache API calls.
 //! - **Features**:
 //!   - **ApiCallBuilder**: Make and cache API calls effortlessly, and manage cached data for efficient API usage.
 //!
-//! ## `loop_utils`
+//! ### `loop_utils`
 //! - **Purpose**: Simplify asynchronous operations in loops.
 //! - **Features**:
 //!   - **FutureLoop**: Handle multiple tasks simultaneously when working with lists or collections, while working with a fluent interface.
