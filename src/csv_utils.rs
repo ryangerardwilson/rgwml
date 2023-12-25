@@ -216,7 +216,6 @@ pub struct CsvBuilder {
 }
 
 impl CsvBuilder {
-
     /// A function to print documentation for easy reference
     pub fn get_docs() -> String {
         let docs = r#"
@@ -288,6 +287,7 @@ Example 2: Load from an existing file
     .print_rows()
     .print_unique("column_name")
     .save_as("/path/to/your/file2.csv")
+    .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
 
 4. Extract a Vector `Vec<String>` List
 --------------------------------------
@@ -295,7 +295,9 @@ Example 2: Load from an existing file
 These methods return a list, and hence, can not be subsequently chained.
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
-    .get_unique("column_name") // Returns a Vec<String>
+
+    .get_unique("column_name"); // Returns a Vec<String>
+    .get("column_name"); // Returns cell content as a String, if the csv has been filtered to single row.
 
 "#;
         // docs.to_string();
@@ -304,7 +306,6 @@ These methods return a list, and hence, can not be subsequently chained.
 
         docs.to_string()
     }
-
 
     /// Creates a new `CsvBuilder` instance with empty headers and data.
     ///
@@ -400,6 +401,48 @@ These methods return a list, and hence, can not be subsequently chained.
         Ok(self)
     }
 
+    /// Groups data by the given column and value, then saves each group to a CSV file.
+    pub fn split_as(&mut self, column_name: &str, folder_path: &str) -> Result<(), Box<dyn Error>> {
+        let column_index = self
+            .headers
+            .iter()
+            .position(|h| h == column_name)
+            .ok_or("Column name not found")?;
+
+        // Group data by the specified column value
+        let mut groups: HashMap<String, Vec<Vec<String>>> = HashMap::new();
+        for row in &self.data {
+            if let Some(value) = row.get(column_index) {
+                groups
+                    .entry(value.clone())
+                    .or_insert_with(Vec::new)
+                    .push(row.clone());
+            }
+        }
+
+        // Create a CSV file for each group
+        for (value, rows) in groups {
+            let file_name = format!(
+                "{}/group_split_by_{}_in_{}.csv",
+                folder_path, value, column_name
+            );
+            let file = File::create(file_name)?;
+            let mut wtr = Writer::from_writer(file);
+
+            // Write the headers
+            wtr.write_record(&self.headers)?;
+
+            // Write the data rows for this group
+            for row in rows {
+                wtr.write_record(&row)?;
+            }
+
+            wtr.flush()?;
+        }
+
+        Ok(())
+    }
+
     /// Sets the CSV header using an array of strings.
     pub fn set_header(&mut self, header: Vec<&str>) -> &mut Self {
         if self.error.is_none() {
@@ -439,7 +482,6 @@ These methods return a list, and hence, can not be subsequently chained.
 
     /// Adds multiple column headers
     pub fn add_column_headers(&mut self, column_names: Vec<&str>) -> &mut Self {
-
         if self.error.is_none() {
             for &column_name in column_names.iter() {
                 self.headers.push(column_name.to_string());
@@ -827,6 +869,35 @@ These methods return a list, and hence, can not be subsequently chained.
             }
         }
         unique_values.into_iter().collect()
+    }
+
+    /// Returns the unique value for a specified column as a `String` if there's only one result. Prints a message if more than one value is detected, suggesting to use `get_unique()` instead.
+    pub fn get(&mut self, column_name: &str) -> String {
+        let mut unique_value: Option<String> = None;
+        let mut multiple_values_detected = false;
+
+        if let Some(index) = self.headers.iter().position(|h| h == column_name) {
+            for row in &self.data {
+                if let Some(value) = row.get(index) {
+                    let cleaned_value = Self::clean_string_value(value);
+                    if let Some(existing_value) = unique_value.take() {
+                        if existing_value != cleaned_value {
+                            multiple_values_detected = true;
+                            break;
+                        }
+                    } else {
+                        unique_value = Some(cleaned_value);
+                    }
+                }
+            }
+        }
+
+        if multiple_values_detected {
+            let message = "Multiple values detected. Use get_unique() instead".to_string();
+            message
+        } else {
+            unique_value.unwrap_or_else(|| "No value found".to_string())
+        }
     }
 }
 

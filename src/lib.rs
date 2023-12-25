@@ -6,9 +6,9 @@
 //! ## Modules Overview
 //!
 //! ### `csv_utils`
-//!   - **Purpose**: A Comprehensive Toolkit for CSV File Management, in AI/ML pipelines. 
-//!   - **Features**: `csv_utils` offers a powerful suite of tools designed for efficient and flexible handling of CSV files. Key components include: 
-//!     - **CsvBuilder**: A versatile builder for creating and manipulating CSV files, facilitating:- 
+//!   - **Purpose**: A Comprehensive Toolkit for CSV File Management, in AI/ML pipelines.
+//!   - **Features**: `csv_utils` offers a powerful suite of tools designed for efficient and flexible handling of CSV files. Key components include:
+//!     - **CsvBuilder**: A versatile builder for creating and manipulating CSV files, facilitating:-
 //!       - **Easy Initialization**: Start with a new CSV or load from an existing file.
 //!       - **Custom Headers and Rows**: Set custom headers and add rows effortlessly.
 //!       - **Advanced Data Manipulation**: Rename, drop, and reorder columns, sort data, and apply complex filters like fuzzy matching and timestamp comparisons.

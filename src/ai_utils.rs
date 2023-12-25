@@ -373,5 +373,3 @@ pub struct NeuralAssociations2DDataFrameConfig {
     pub input_column: &'static str,
     pub output_column: &'static str,
 }
-
-

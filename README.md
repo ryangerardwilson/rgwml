@@ -169,13 +169,16 @@ Example 2: Load from an existing file
     .print_rows()
     .print_unique("column_name")
     .save_as("/path/to/your/file2.csv")
+    .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
 
 #### Extract a Vector `Vec<String>` List
 
 These methods return a list, and hence, can not be subsequently chained.
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
-    .get_unique("column_name") // Returns a Vec<String>
+
+    .get_unique("column_name"); // Returns a Vec<String>
+    .get("column_name"); // Returns cell content as a String, if the csv has been filtered to single row.
 
 ### CsvResultCacher
 
