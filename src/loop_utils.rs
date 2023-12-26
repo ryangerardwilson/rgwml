@@ -1,8 +1,6 @@
 use futures::future::join_all;
 use std::future::Future;
 use std::time::Instant;
-use std::sync::Arc;
-use tokio::{task, time};
 
 pub struct FutureLoop;
 
