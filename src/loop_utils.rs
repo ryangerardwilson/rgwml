@@ -1,6 +1,5 @@
 use futures::future::join_all;
 use std::future::Future;
-use std::time::Instant;
 
 pub struct FutureLoop;
 

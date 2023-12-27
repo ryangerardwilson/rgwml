@@ -12,7 +12,6 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
-use std::io::{self, ErrorKind};
 use std::pin::Pin;
 use std::time::{Duration, SystemTime};
 
@@ -977,7 +976,7 @@ These methods return a list, and hence, can not be subsequently chained.
         }
 
         // Now create common_headers after mutating self.headers
-        let common_headers: HashSet<&String> = self.headers.iter().collect();
+        //let _common_headers: HashSet<&String> = self.headers.iter().collect();
 
         // Map headers to indices for the new file
         let header_indices: HashMap<_, _> = temp_builder
@@ -997,7 +996,7 @@ These methods return a list, and hence, can not be subsequently chained.
                 // Merge without duplicates
                 let mut existing_rows: HashSet<Vec<String>> = self.data.drain(..).collect();
 
-                for mut row in temp_builder.data {
+                for row in temp_builder.data {
                     let mut aligned_row = vec![String::new(); self.headers.len()];
 
                     // Fill in data for common headers
