@@ -1145,7 +1145,7 @@ These methods return a list, and hence, can not be subsequently chained.
 
     /// Performs a flexible intersection operation with the data from another CSV file. This reads data from another CSV file and retains only the rows that are common to both the current data and the new file (aligning common headers). This method retains only the common rows between the current data and the specified CSV file.
     pub fn set_intersection_with(&mut self, file_path: &str) -> &mut Self {
-        let mut temp_builder = CsvBuilder::from_csv(file_path);
+        let temp_builder = CsvBuilder::from_csv(file_path);
 
         if let Some(error) = temp_builder.error {
             self.error = Some(error);
