@@ -326,10 +326,10 @@ Example 2: Load from an existing file
     // L. Save
     .save_as("/path/to/your/file2.csv")
 
-4. Extract a Vector `Vec<String>` List
---------------------------------------
+4. Extract Data
+---------------
 
-These methods return a list, and hence, can not be subsequently chained.
+These methods return a CsvBuilder object, and hence, can not be subsequently chained.
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
 
