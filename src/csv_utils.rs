@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
+use std::io::{self, ErrorKind};
 use std::pin::Pin;
 use std::time::{Duration, SystemTime};
 
@@ -259,26 +260,44 @@ Example 2: Load from an existing file
 --------------------
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
+    // A. Setting and adding headers
     .set_header(vec!["Header1", "Header2", "Header3"])
     .add_column_header("NewColumn1")
     .add_column_headers(vec!["NewColumn2", "NewColumn3"])
+    
+    // B. Ordering columns
     .order_columns(vec!["Column1", "...", "Column5", "Column2"])
     .order_columns(vec!["...", "Column5", "Column2"])
     .order_columns(vec!["Column1", "Column5", "..."])
+    
+    // C. Modifying columns
     .drop_columns(vec!["Column1", "Column3"])
     .rename_columns(vec![("Column1", "NewColumn1"), ("Column3", "NewColumn3")])
+    
+    // D. Adding and modifying rows
     .add_row(vec!["Row1-1", "Row1-2", "Row1-3"])
     .add_rows(vec![vec!["Row1-1", "Row1-2", "Row1-3"], vec!["Row2-1", "Row2-2", "Row2-3"]])
+    .remove_duplicates()
+    
+    // E. Replacing values
+    .replace_all(vec!["Column1", "Column2"], vec![("null", ""), ("NA", "-")]) // In specified columns
+    .replace_all(vec!["*"], vec![("null", ""), ("NA", "-")]) // In all columns
+    
+    // F. Limiting and sorting
     .limit(10)
     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
+    
+    // G. Applying conditional operations
     .where_("column1", "==", "42", "COMPARE_AS_NUMBERS")
-    .where_("column1", "==", "hello", "COMPARE_AS_TEXT"),
+    .where_("column1", "==", "hello", "COMPARE_AS_TEXT")
     .where_("column1", "CONTAINS", "apples", "COMPARE_AS_TEXT")
     .where_("column1", "DOES_NOT_CONTAIN", "apples", "COMPARE_AS_TEXT")
     .where_("column1", "STARTS_WITH", "discounted", "COMPARE_AS_TEXT")
-    .where_("stated_locality_address","FUZZ_MIN_SCORE_90",vec!["Shastri park","kamal nagar"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
+    .where_("stated_locality_address","FUZZ_MIN_SCORE_90",vec!["Shastri park","kamal nagar"], "COMPARE_AS_TEXT")
     .where_("column1", ">", "23-01-01", "COMPARE_AS_TIMESTAMPS")
-    .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting"), // Sets column 9's value to "greeting", where the condition is met. This syntax applies analogously to other where_ clauses as well
+    .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting")
+
+    // H. Analytical Prints for data inspection
     .print_columns()
     .print_row_count()
     .print_first_row()
@@ -286,8 +305,27 @@ Example 2: Load from an existing file
     .print_rows_range(2,5)
     .print_rows()
     .print_unique("column_name")
-    .save_as("/path/to/your/file2.csv")
+
+    // I. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
+
+    // J. Basic Set Theory Operations (for the Universe U = {1,2,3,4,5,6,7}, A = {1,2,3} and B = {3,4,5})
+    .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL") // {1,2,3,3,4,5} 
+    .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL_WITHOUT_DUPLICATES") // {1,2,3,4,5}
+    .set_intersection_with("/path/to/set_b/file.csv") // {3}
+    .set_difference_with("/path/to/set_b/file.csv") // {1,2} i.e. in A but not in B
+    .set_symmetric_difference_with("/path/to/set_b/file.csv") // {1,2,4,5} i.e. in either, but not in intersection
+    
+    // .set_complement_with determines the compliment qua the universe i.e. {4,5,6,7}. Pass an exclusion vector to exclude specific columns of the universe from consideration, or use vec!["INCLUDE_ALL"] to include all columns of the universe.
+    .set_complement_with("/path/to/universe_set_u/file.csv", vec!["INCLUDE_ALL"]) 
+    .set_complement_with("/path/to/universe_set_u/file.csv", vec!["Column4", "Column5"]) 
+
+    // K. Advanced Set Theory Operations
+    .set_union_with("/path/to/table_b.csv", "UNION_TYPE:LEFT_JOIN_AT{{Column1}}") // Left join using "Column1" as the join column.
+    .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
+
+    // L. Save
+    .save_as("/path/to/your/file2.csv")
 
 4. Extract a Vector `Vec<String>` List
 --------------------------------------
@@ -308,16 +346,6 @@ These methods return a list, and hence, can not be subsequently chained.
     }
 
     /// Creates a new `CsvBuilder` instance with empty headers and data.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rgwml::csv_utils::CsvBuilder;
-    ///
-    /// let builder = CsvBuilder::new();
-    /// ```
-    ///
-    /// Creates an empty `CsvBuilder` instance that can be used to build a CSV file.
     pub fn new() -> Self {
         CsvBuilder {
             headers: Vec::new(),
@@ -328,20 +356,6 @@ These methods return a list, and hence, can not be subsequently chained.
     }
 
     /// Reads data from a CSV file at the specified `file_path` and returns a `CsvBuilder`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rgwml::csv_utils::CsvBuilder;
-    ///
-    /// let result = CsvBuilder::from_csv("/path/to/your/file.csv")
-    ///     .add_row(&["Row1-1", "Row1-2", "Row1-3"])
-    ///     .add_rows(&[&["Row2-1", "Row2-2", "Row2-3"], &["Row3-1", "Row3-2", "Row3-3"]])
-    ///     .save_as("/path/to/your/file.csv");
-    /// ```
-    ///
-    /// Creates a `CsvBuilder` from an existing CSV file, sets headers, and adds rows using method chaining.
-
     pub fn from_csv(file_path: &str) -> Self {
         let mut builder = CsvBuilder::new();
 
@@ -898,6 +912,418 @@ These methods return a list, and hence, can not be subsequently chained.
         } else {
             unique_value.unwrap_or_else(|| "No value found".to_string())
         }
+    }
+
+    /// Removes duplicate rows from the CSV data. This method ensures that only unique rows are retained in the `CsvBuilder`.
+    pub fn remove_duplicates(&mut self) -> &mut Self {
+        let original_count = self.data.len();
+        let mut unique_rows = HashSet::new();
+        self.data.retain(|row| unique_rows.insert(row.clone()));
+        let duplicates_removed = original_count - unique_rows.len();
+
+        println!("Number of duplicate rows removed: {}", duplicates_removed);
+
+        self
+    }
+
+    /// Replaces multiple sets of string occurrences in specified data columns.
+    pub fn replace_all(
+        &mut self,
+        columns: Vec<&str>,
+        replacements: Vec<(&str, &str)>,
+    ) -> &mut Self {
+        let apply_to_all = columns.iter().any(|&col| col == "*");
+        let column_indices: Vec<usize> = if apply_to_all {
+            (0..self.headers.len()).collect()
+        } else {
+            columns
+                .iter()
+                .filter_map(|&col| self.headers.iter().position(|h| h == col))
+                .collect()
+        };
+
+        for row in &mut self.data {
+            for &index in &column_indices {
+                if let Some(item) = row.get_mut(index) {
+                    for (from, to) in &replacements {
+                        *item = item.replace(*from, *to);
+                    }
+                }
+            }
+        }
+        self
+    }
+
+    /// Performs a flexible union operation with the data from another CSV file. This reads data from another CSV file, combines it with the current data (aligning common headers), appends non-common headers, and returns a reference to the modified `CsvBuilder`.
+    pub fn set_union_with(&mut self, file_path: &str, union_type: &str) -> &mut Self {
+        let mut temp_builder = CsvBuilder::from_csv(file_path);
+
+        if let Some(error) = temp_builder.error {
+            self.error = Some(error);
+            return self;
+        }
+
+        // Identify unique headers
+        let unique_headers_temp: Vec<String> = temp_builder
+            .headers
+            .iter()
+            .filter(|h| !self.headers.contains(h))
+            .cloned()
+            .collect();
+
+        // Update the headers of the current builder
+        for header in &unique_headers_temp {
+            self.headers.push(header.to_string());
+        }
+
+        // Now create common_headers after mutating self.headers
+        let common_headers: HashSet<&String> = self.headers.iter().collect();
+
+        // Map headers to indices for the new file
+        let header_indices: HashMap<_, _> = temp_builder
+            .headers
+            .iter()
+            .enumerate()
+            .map(|(i, h)| (h.clone(), i))
+            .collect();
+
+        // Determine union operation type
+        match union_type {
+            "UNION_TYPE:ALL" => {
+                // Simple merge - Just append all rows
+                self.data.append(&mut temp_builder.data);
+            }
+            "UNION_TYPE:ALL_WITHOUT_DUPLICATES" => {
+                // Merge without duplicates
+                let mut existing_rows: HashSet<Vec<String>> = self.data.drain(..).collect();
+
+                for mut row in temp_builder.data {
+                    let mut aligned_row = vec![String::new(); self.headers.len()];
+
+                    // Fill in data for common headers
+                    for (i, header) in self.headers.iter().enumerate() {
+                        if let Some(&index) = header_indices.get(header) {
+                            if let Some(value) = row.get(index) {
+                                aligned_row[i] = value.clone();
+                            }
+                        }
+                    }
+
+                    existing_rows.insert(aligned_row);
+                }
+
+                self.data = existing_rows.into_iter().collect();
+            }
+
+            op if op.starts_with("UNION_TYPE:LEFT_JOIN_AT{{") => {
+                // Extract the join column name from within double curly braces
+                let join_column_start = "UNION_TYPE:LEFT_JOIN_AT{{".len();
+                let join_column_end = op.find("}}").unwrap_or(op.len());
+                let join_column = &op[join_column_start..join_column_end];
+
+                if !self.headers.contains(&join_column.to_string())
+                    || !temp_builder.headers.contains(&join_column.to_string())
+                {
+                    println!(
+                        "Join column {{{}}} not found in one or both datasets.",
+                        join_column
+                    );
+                    return self;
+                }
+
+                let left_join_index = self.headers.iter().position(|h| h == join_column).unwrap();
+                let right_join_index = temp_builder
+                    .headers
+                    .iter()
+                    .position(|h| h == join_column)
+                    .unwrap();
+
+                let mut joined_data = Vec::new();
+
+                for left_row in &self.data {
+                    let left_join_value = &left_row[left_join_index];
+
+                    let mut combined_row = left_row.clone();
+
+                    // Check for a matching row in the right dataset
+                    if let Some(right_row) = temp_builder
+                        .data
+                        .iter()
+                        .find(|right_row| &right_row[right_join_index] == left_join_value)
+                    {
+                        // Combine data from the right row, avoiding duplicate join column values
+                        for (i, value) in right_row.iter().enumerate() {
+                            if i != right_join_index {
+                                combined_row.push(value.clone());
+                            }
+                        }
+                    } else {
+                        // No matching row, append empty strings for right dataset columns
+                        combined_row.append(&mut vec![String::new(); unique_headers_temp.len()]);
+                    }
+
+                    joined_data.push(combined_row);
+                }
+
+                self.data = joined_data;
+            }
+
+            op if op.starts_with("UNION_TYPE:RIGHT_JOIN_AT{{") => {
+                let join_column_start = "UNION_TYPE:RIGHT_JOIN_AT{{".len();
+                let join_column_end = op.find("}}").unwrap_or(op.len());
+                let join_column = &op[join_column_start..join_column_end];
+
+                if !self.headers.contains(&join_column.to_string())
+                    || !temp_builder.headers.contains(&join_column.to_string())
+                {
+                    println!(
+                        "Join column {{{}}} not found in one or both datasets.",
+                        join_column
+                    );
+                    return self;
+                }
+
+                let left_join_index = self.headers.iter().position(|h| h == join_column).unwrap();
+                let right_join_index = temp_builder
+                    .headers
+                    .iter()
+                    .position(|h| h == join_column)
+                    .unwrap();
+
+                let mut new_headers = temp_builder.headers.clone();
+                for header in &self.headers {
+                    if !new_headers.contains(header) {
+                        new_headers.push(header.clone());
+                    }
+                }
+
+                let mut joined_data = Vec::new();
+
+                for right_row in &temp_builder.data {
+                    let right_join_value = &right_row[right_join_index];
+                    let mut combined_row = vec![String::new(); new_headers.len()];
+
+                    // Populate values from the right row
+                    for (i, value) in right_row.iter().enumerate() {
+                        let target_index = new_headers
+                            .iter()
+                            .position(|h| h == &temp_builder.headers[i])
+                            .unwrap();
+                        combined_row[target_index] = value.clone();
+                    }
+
+                    // Try to find a matching row in the left dataset
+                    if let Some(left_row) = self
+                        .data
+                        .iter()
+                        .find(|left_row| &left_row[left_join_index] == right_join_value)
+                    {
+                        for (left_i, left_value) in left_row.iter().enumerate() {
+                            let left_header = &self.headers[left_i];
+                            if left_header != join_column {
+                                // Skip the join column
+                                let target_index =
+                                    new_headers.iter().position(|h| h == left_header).unwrap();
+                                combined_row[target_index] = left_value.clone();
+                            }
+                        }
+                    }
+
+                    joined_data.push(combined_row);
+                }
+
+                self.headers = new_headers;
+                self.data = joined_data;
+            }
+
+            _ => {
+                println!("Unknown union operation type: {}", union_type);
+            }
+        }
+
+        self
+    }
+
+    /// Performs a flexible intersection operation with the data from another CSV file. This reads data from another CSV file and retains only the rows that are common to both the current data and the new file (aligning common headers). This method retains only the common rows between the current data and the specified CSV file.
+    pub fn set_intersection_with(&mut self, file_path: &str) -> &mut Self {
+        let mut temp_builder = CsvBuilder::from_csv(file_path);
+
+        if let Some(error) = temp_builder.error {
+            self.error = Some(error);
+            return self;
+        }
+
+        // Identify common headers
+        let common_headers: HashSet<&String> = self.headers.iter().collect();
+        let temp_common_headers: HashSet<&String> = temp_builder
+            .headers
+            .iter()
+            .filter(|h| common_headers.contains(h))
+            .collect();
+
+        // Map headers to indices for both files
+        let self_header_indices: HashMap<_, _> = self
+            .headers
+            .iter()
+            .enumerate()
+            .map(|(i, h)| (h, i))
+            .collect();
+        let temp_header_indices: HashMap<_, _> = temp_builder
+            .headers
+            .iter()
+            .enumerate()
+            .map(|(i, h)| (h, i))
+            .collect();
+
+        // Align and intersect the data
+        let existing_rows: HashSet<Vec<String>> = self.data.drain(..).collect();
+        let mut intersected_rows = HashSet::new();
+
+        for row in temp_builder.data {
+            let mut aligned_row = vec![String::new(); self.headers.len()];
+
+            // Align data for common headers
+            let mut is_common_row = true;
+            for header in &temp_common_headers {
+                if let (Some(&self_index), Some(&temp_index)) = (
+                    self_header_indices.get(header),
+                    temp_header_indices.get(header),
+                ) {
+                    if let Some(value) = row.get(temp_index) {
+                        aligned_row[self_index] = value.clone();
+                    } else {
+                        is_common_row = false;
+                        break;
+                    }
+                }
+            }
+
+            if is_common_row && existing_rows.contains(&aligned_row) {
+                intersected_rows.insert(aligned_row);
+            }
+        }
+
+        self.data = intersected_rows.into_iter().collect();
+
+        self
+    }
+
+    /// Performs a difference operation with the data from another CSV file. Retains only the rows that are in the current data but not in the new file.
+    pub fn set_difference_with(&mut self, file_path: &str) -> &mut Self {
+        let temp_builder = CsvBuilder::from_csv(file_path);
+        if let Some(error) = temp_builder.error {
+            self.error = Some(error);
+            return self;
+        }
+
+        let other_data: HashSet<Vec<String>> = temp_builder.data.into_iter().collect();
+        self.data.retain(|row| !other_data.contains(row));
+        self
+    }
+
+    /// Performs a symmetric difference operation with the data from another CSV file. Retains only the rows that are in either the current data or the new file, but not in both.
+    pub fn set_symmetric_difference_with(&mut self, file_path: &str) -> &mut Self {
+        let temp_builder = CsvBuilder::from_csv(file_path);
+        if let Some(error) = temp_builder.error {
+            self.error = Some(error);
+            return self;
+        }
+
+        let other_data: HashSet<Vec<String>> = temp_builder.data.into_iter().collect();
+        let self_data: HashSet<Vec<String>> = self.data.drain(..).collect();
+
+        let symmetric_difference: HashSet<_> = self_data
+            .symmetric_difference(&other_data)
+            .cloned()
+            .collect();
+
+        self.data = symmetric_difference.into_iter().collect();
+        self
+    }
+
+    /// Checks if the universe file is universal with respect to both the columns and rows of the instantiated CSV file. Returns the complement if it is universal, otherwise indicates the reason for being non-universal.
+    pub fn set_complement_with(
+        &mut self,
+        universe_file_path: &str,
+        exclude_columns: Vec<&str>,
+    ) -> &mut Self {
+        let universe_builder = CsvBuilder::from_csv(universe_file_path);
+        if universe_builder.error.is_some() {
+            println!("Error reading the universe file.");
+            return self;
+        }
+
+        let include_all = exclude_columns.contains(&"INCLUDE_ALL");
+
+        let universe_headers: HashSet<&String> = universe_builder.headers.iter().collect();
+        let self_headers: HashSet<&String> = if include_all {
+            self.headers.iter().collect()
+        } else {
+            self.headers
+                .iter()
+                .filter(|h| !exclude_columns.contains(&h.as_str()))
+                .collect()
+        };
+
+        // Check for any extra columns in self that are not in universe
+        let extra_columns: Vec<_> = self_headers.difference(&universe_headers).collect();
+        if !extra_columns.is_empty() {
+            println!(
+                "Self object has extra columns not present in the universe: {:?}",
+                extra_columns
+            );
+            return self;
+        }
+
+        // Filter out excluded columns from universe data
+        let universe_data: HashSet<Vec<String>> = universe_builder
+            .data
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .enumerate()
+                    .filter_map(|(i, value)| {
+                        if universe_builder
+                            .headers
+                            .get(i)
+                            .map_or(false, |h| !exclude_columns.contains(&h.as_str()))
+                        {
+                            Some(value)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // Filter out excluded columns from self data
+        let self_data: HashSet<Vec<String>> = self
+            .data
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .enumerate()
+                    .filter_map(|(i, value)| {
+                        if self
+                            .headers
+                            .get(i)
+                            .map_or(false, |h| !exclude_columns.contains(&h.as_str()))
+                        {
+                            Some(value.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // Determine rows in the universe but not in self
+        let complement: HashSet<_> = universe_data.difference(&self_data).cloned().collect();
+        self.data = complement.into_iter().collect();
+
+        self
     }
 }
 

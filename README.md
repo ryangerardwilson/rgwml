@@ -141,26 +141,44 @@ Example 2: Load from an existing file
 #### Chainable Options
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
+    // A. Setting and adding headers
     .set_header(vec!["Header1", "Header2", "Header3"])
     .add_column_header("NewColumn1")
     .add_column_headers(vec!["NewColumn2", "NewColumn3"])
+    
+    // B. Ordering columns
     .order_columns(vec!["Column1", "...", "Column5", "Column2"])
     .order_columns(vec!["...", "Column5", "Column2"])
     .order_columns(vec!["Column1", "Column5", "..."])
+    
+    // C. Modifying columns
     .drop_columns(vec!["Column1", "Column3"])
     .rename_columns(vec![("Column1", "NewColumn1"), ("Column3", "NewColumn3")])
+    
+    // D. Adding and modifying rows
     .add_row(vec!["Row1-1", "Row1-2", "Row1-3"])
     .add_rows(vec![vec!["Row1-1", "Row1-2", "Row1-3"], vec!["Row2-1", "Row2-2", "Row2-3"]])
+    .remove_duplicates()
+    
+    // E. Replacing values
+    .replace_all(vec!["Column1", "Column2"], vec![("null", ""), ("NA", "-")]) // In specified columns
+    .replace_all(vec!["*"], vec![("null", ""), ("NA", "-")]) // In all columns
+    
+    // F. Limiting and sorting
     .limit(10)
     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
+    
+    // G. Applying conditional operations
     .where_("column1", "==", "42", "COMPARE_AS_NUMBERS")
-    .where_("column1", "==", "hello", "COMPARE_AS_TEXT"),
+    .where_("column1", "==", "hello", "COMPARE_AS_TEXT")
     .where_("column1", "CONTAINS", "apples", "COMPARE_AS_TEXT")
     .where_("column1", "DOES_NOT_CONTAIN", "apples", "COMPARE_AS_TEXT")
     .where_("column1", "STARTS_WITH", "discounted", "COMPARE_AS_TEXT")
-    .where_("stated_locality_address","FUZZ_MIN_SCORE_90",vec!["Shastri park","kamal nagar"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
+    .where_("stated_locality_address","FUZZ_MIN_SCORE_90",vec!["Shastri park","kamal nagar"], "COMPARE_AS_TEXT")
     .where_("column1", ">", "23-01-01", "COMPARE_AS_TIMESTAMPS")
-    .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting"), // Sets column 9's value to "greeting", where the condition is met. This syntax applies analogously to other where_ clauses as well
+    .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting")
+
+    // H. Analytical Prints for data inspection
     .print_columns()
     .print_row_count()
     .print_first_row()
@@ -168,8 +186,29 @@ Example 2: Load from an existing file
     .print_rows_range(2,5)
     .print_rows()
     .print_unique("column_name")
-    .save_as("/path/to/your/file2.csv")
+
+    // I. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
+
+    // J. Basic Set Theory Operations (for the Universe U = {1,2,3,4,5,6,7}, A = {1,2,3} and B = {3,4,5})
+    .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL") // {1,2,3,3,4,5} 
+    .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL_WITHOUT_DUPLICATES") // {1,2,3,4,5}
+    .set_intersection_with("/path/to/set_b/file.csv") // {3}
+    .set_difference_with("/path/to/set_b/file.csv") // {1,2} i.e. in A but not in B
+    .set_symmetric_difference_with("/path/to/set_b/file.csv") // {1,2,4,5} i.e. in either, but not in intersection
+    
+    // .set_complement_with determines the compliment qua the universe i.e. {4,5,6,7}. Pass an exclusion vector to exclude specific columns of the universe from consideration, or use vec!["INCLUDE_ALL"] to include all columns of the universe.
+    .set_complement_with("/path/to/universe_set_u/file.csv", vec!["INCLUDE_ALL"]) 
+    .set_complement_with("/path/to/universe_set_u/file.csv", vec!["Column4", "Column5"]) 
+
+    // K. Advanced Set Theory Operations
+    .set_union_with("/path/to/table_b.csv", "UNION_TYPE:LEFT_JOIN_AT{{Column1}}") // Left join using "Column1" as the join column.
+    .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
+
+    // L. Save
+    .save_as("/path/to/your/file2.csv")
+
+
 
 #### Extract a Vector `Vec<String>` List
 
@@ -375,10 +414,8 @@ Examples across common API call patterns
 
 `FutureLoop` provides a fluent interface to do multiple things at once (asynchronously) when dealing with a list or collection of items. 
 
-The future_for function suits scenarios where you need a moderate level of concurrency. Since all futures are collected and then awaited together, it's important to ensure that spawning too many futures at once doesn't overwhelm the system resources. For instance, when each item's processing is relatively straightforward and doesn't require complex shared state or high-throughput parallelism. 
+The future_for function suits scenarios where you need a moderate level of concurrency. For instance, when each item's processing is relatively straightforward and doesn't require complex shared state or high-throughput parallelism. 
 
-Use in a single-threaded Tokio environment
-    
     use rgwml::loop_utils::FutureLoop;
 
     #[tokio::main()]
@@ -390,66 +427,6 @@ Use in a single-threaded Tokio environment
         }).await;
         println!("Results: {:?}", results);
     }
-
-Use in a multi-threaded Tokio environment:
-
-    use rgwml::loop_utils::FutureLoop;
-
-    #[tokio::main(flavor = "multi_thread")]
-    async fn main() {
-        // Data for the first task
-        let data1 = vec![1, 2, 3, 4, 5];
-
-        // Spawning the first `future_for` task
-        let handle1 = tokio::spawn(async move {
-            FutureLoop::future_for(data1, |num| async move {
-                // Perform an async operation
-                num * 2
-            }).await
-        });
-
-        // Data for the second task
-        let data2 = vec![6, 7, 8, 9, 10];
-
-        // Spawning the second `future_for` task
-        let handle2 = tokio::spawn(async move {
-            FutureLoop::future_for(data2, |num| async move {
-                // Another async operation
-                num * 3
-            }).await
-        });
-
-        // Awaiting results from both tasks
-        let results1 = handle1.await.expect("Task 1 failed");
-        let results2 = handle2.await.expect("Task 2 failed");
-
-        println!("Results from first task: {:?}", results1);
-        println!("Results from second task: {:?}", results2);
-    }
-
-Multi Threaded CPU Capacity Test
-
-    use rgwml::loop_utils::FutureLoop;
-
-    #[tokio::main(flavor = "multi_thread")]
-    async fn main() {
-
-        // Start the first test_capacity task and hold its future
-        let handle1 = tokio::spawn(async {
-            FutureLoop::test_capacity(2500).await;
-        });
-
-        // Start the second test_capacity task with a value of 1000
-        let handle2 = tokio::spawn(async {
-            FutureLoop::test_capacity(2500).await;
-        });
-
-        // You can await the futures here if you need to get the results or ensure completion
-        let _ = handle1.await.expect("Task 1 failed");
-        let _ = handle2.await.expect("Task 2 failed");
-
-    }
-
 
 6. License
 ----------
