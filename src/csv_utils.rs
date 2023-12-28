@@ -278,7 +278,8 @@ Example 2: Load from an existing file
     .add_rows(vec![vec!["Row1-1", "Row1-2", "Row1-3"], vec!["Row2-1", "Row2-2", "Row2-3"]])
     .remove_duplicates()
     
-    // E. Replacing values
+    // E. Cleaning/ Replacing Cell values
+    .trim_all() // Trims white spaces at the beginning and end of all cells in all columns.
     .replace_all(vec!["Column1", "Column2"], vec![("null", ""), ("NA", "-")]) // In specified columns
     .replace_all(vec!["*"], vec![("null", ""), ("NA", "-")]) // In all columns
     
@@ -304,6 +305,7 @@ Example 2: Load from an existing file
     .print_rows_range(2,5)
     .print_rows()
     .print_unique("column_name")
+    .print_freq(vec!["Column1", "Column2"])
 
     // I. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
@@ -335,6 +337,7 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
 
     .get_unique("column_name"); // Returns a Vec<String>
     .get("column_name"); // Returns cell content as a String, if the csv has been filtered to single row.
+    .get_freq(vec!["Column1", Column2]) // Returns a HashMap where keys are column names and values are vectors of sorted (value, frequency) pairs.
 
 "#;
         // docs.to_string();
@@ -656,6 +659,45 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         self
     }
 
+
+    /// Aesthetically prints the frequency of all unique values in the indicated columns, sorted by frequency.
+    pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
+        let mut column_indices = Vec::new();
+
+        // Find the indices of the specified columns
+        for col in &columns {
+            if let Some(index) = self.headers.iter().position(|r| r == col) {
+                column_indices.push(index);
+            } else {
+                println!("Column '{}' not found.", col);
+            }
+        }
+
+        for &col_idx in &column_indices {
+            let mut freq_map: HashMap<String, usize> = HashMap::new();
+
+            // Count the frequency of each unique value
+            for row in &self.data {
+                if let Some(value) = row.get(col_idx) {
+                    *freq_map.entry(value.clone()).or_insert(0) += 1;
+                }
+            }
+
+            // Sorting the frequency map
+            let mut sorted_freq: Vec<(String, usize)> = freq_map.into_iter().collect();
+            sorted_freq.sort_by(|a, b| b.1.cmp(&a.1));
+
+            // Print the frequencies
+            println!("\nFrequency for column '{}':", self.headers[col_idx]);
+            for (value, count) in sorted_freq {
+                println!("{}: {}", value, count);
+            }
+        }
+
+        self
+    }
+
+
     /// Sorts the CSV data based on specified column orders.
     pub fn cascade_sort<'a>(&'a mut self, orders: Vec<(&'a str, &'a str)>) -> &'a mut Self {
         // pub fn cascade_sort(mut self, orders: Vec<(&str, &str)>) -> &mut Self {
@@ -913,6 +955,35 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         }
     }
 
+    /// Returns a HashMap where keys are column names and values are vectors of sorted (value, frequency) pairs.
+    pub fn get_freq(&mut self, columns: Vec<&str>) -> HashMap<String, Vec<(String, usize)>> {
+        let mut results = HashMap::new();
+
+        // Finding indices for each column
+        let column_indices: Vec<usize> = columns
+            .iter()
+            .filter_map(|&col| self.headers.iter().position(|h| h == col))
+            .collect();
+
+        for &col_idx in &column_indices {
+            let mut freq_map: HashMap<String, usize> = HashMap::new();
+            for row in &self.data {
+                if let Some(value) = row.get(col_idx) {
+                    *freq_map.entry(value.clone()).or_insert(0) += 1;
+                }
+            }
+
+            // Sorting the frequency map
+            let mut sorted_freq: Vec<(String, usize)> = freq_map.into_iter().collect();
+            sorted_freq.sort_by(|a, b| b.1.cmp(&a.1));
+
+            let column_name = &self.headers[col_idx];
+            results.insert(column_name.clone(), sorted_freq);
+        }
+
+        results
+    }    
+
     /// Removes duplicate rows from the CSV data. This method ensures that only unique rows are retained in the `CsvBuilder`.
     pub fn remove_duplicates(&mut self) -> &mut Self {
         let original_count = self.data.len();
@@ -950,6 +1021,17 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
                 }
             }
         }
+        self
+    }
+
+    /// Trims white spaces at the beginning and end of all cells in all columns.
+    pub fn trim_all(&mut self) -> &mut Self {
+        for row in &mut self.data {
+            for item in row.iter_mut() {
+                *item = item.trim().to_string();
+            }
+        }
+
         self
     }
 

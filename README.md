@@ -160,7 +160,8 @@ Example 2: Load from an existing file
     .add_rows(vec![vec!["Row1-1", "Row1-2", "Row1-3"], vec!["Row2-1", "Row2-2", "Row2-3"]])
     .remove_duplicates()
     
-    // E. Replacing values
+    // E. Cleaning/ Replacing Cell values
+    .trim_all() // Trims white spaces at the beginning and end of all cells in all columns.
     .replace_all(vec!["Column1", "Column2"], vec![("null", ""), ("NA", "-")]) // In specified columns
     .replace_all(vec!["*"], vec![("null", ""), ("NA", "-")]) // In all columns
     
@@ -186,6 +187,7 @@ Example 2: Load from an existing file
     .print_rows_range(2,5)
     .print_rows()
     .print_unique("column_name")
+    .print_freq(vec!["Column1", "Column2"])
 
     // I. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
@@ -210,12 +212,13 @@ Example 2: Load from an existing file
 
 #### Extract Data
 
-These methods do not return a CsvBuilder object, and hence, can not be subsequently chained.
+These methods return a CsvBuilder object, and hence, can not be subsequently chained.
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
 
     .get_unique("column_name"); // Returns a Vec<String>
     .get("column_name"); // Returns cell content as a String, if the csv has been filtered to single row.
+    .get_freq(vec!["Column1", Column2]) // Returns a HashMap where keys are column names and values are vectors of sorted (value, frequency) pairs.
 
 ### CsvResultCacher
 
