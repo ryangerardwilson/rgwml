@@ -333,7 +333,14 @@ Example 2: Load from an existing file
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:LEFT_JOIN_AT{{Column1}}") // Left join using "Column1" as the join column.
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
 
-    // L. Save
+    // L. Append Derivative Columns
+    .append_derivative_columns(vec![
+        ("IS_CUSTOMER", "Column1 == {Has paid} OR Column2 == {Has Ordered}"),
+        ("IS_PROSPECT", "Column1 != {Has paid} AND (Column2 != {Has Ordered} AND Column3 != {Has been pitched})"),
+        ("IS_BIG_SPENDING_CUSTOMER", "Column7 > {10000} AND Column8 == {Subscription Active}")
+        ]) // Values need to be placed in {} tags instead of quotations. If the cell content contains the {} characters, you may need to replace them using .replace_all(vec!["Column1", "Column2"], vec![("{", "["), ("}", "]")]) before applying this method
+
+    // M. Save
     .save_as("/path/to/your/file2.csv")
 
 4. Extract Data
@@ -675,7 +682,6 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         self
     }
 
-
     /// Aesthetically prints the frequency of all unique values in the indicated columns, sorted by frequency.
     pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
         let mut column_indices = Vec::new();
@@ -713,58 +719,59 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         self
     }
 
+    pub fn print_freq_mapped(
+        &mut self,
+        columns_with_groupings: Vec<(&str, Vec<(&str, Vec<&str>)>)>,
+    ) -> &mut Self {
+        for (col, groupings) in columns_with_groupings {
+            let col_idx = if let Some(index) = self.headers.iter().position(|r| r == col) {
+                index
+            } else {
+                println!("Column '{}' not found.", col);
+                continue;
+            };
 
-pub fn print_freq_mapped(&mut self, columns_with_groupings: Vec<(&str, Vec<(&str, Vec<&str>)>)>) -> &mut Self {
-    for (col, groupings) in columns_with_groupings {
-        let col_idx = if let Some(index) = self.headers.iter().position(|r| r == col) {
-            index
-        } else {
-            println!("Column '{}' not found.", col);
-            continue;
-        };
+            let mut value_map: HashMap<String, String> = HashMap::new();
+            let mut apply_groupings = true;
 
-        let mut value_map: HashMap<String, String> = HashMap::new();
-        let mut apply_groupings = true;
-
-        for (primary_value, values) in groupings {
-            if primary_value == "NO_GROUPINGS" {
-                apply_groupings = false;
-                break;
+            for (primary_value, values) in groupings {
+                if primary_value == "NO_GROUPINGS" {
+                    apply_groupings = false;
+                    break;
+                }
+                for value in values {
+                    value_map.insert(value.to_string(), primary_value.to_string());
+                }
             }
-            for value in values {
-                value_map.insert(value.to_string(), primary_value.to_string());
+
+            let mut freq_map: HashMap<String, usize> = HashMap::new();
+
+            // Count the frequency of each unique value
+            for row in &self.data {
+                if let Some(value) = row.get(col_idx) {
+                    let value_str = value.to_string();
+                    let grouped_value = if apply_groupings {
+                        value_map.get(&value_str).unwrap_or(&value_str)
+                    } else {
+                        &value_str
+                    };
+                    *freq_map.entry(grouped_value.to_string()).or_insert(0) += 1;
+                }
+            }
+
+            // Sorting the frequency map
+            let mut sorted_freq: Vec<(String, usize)> = freq_map.into_iter().collect();
+            sorted_freq.sort_by(|a, b| b.1.cmp(&a.1));
+
+            // Print the frequencies
+            println!("\nFrequency for column '{}':", self.headers[col_idx]);
+            for (value, count) in sorted_freq {
+                println!("{}: {}", value, count);
             }
         }
 
-        let mut freq_map: HashMap<String, usize> = HashMap::new();
-
-        // Count the frequency of each unique value
-        for row in &self.data {
-            if let Some(value) = row.get(col_idx) {
-                let value_str = value.to_string();
-                let grouped_value = if apply_groupings {
-                    value_map.get(&value_str).unwrap_or(&value_str)
-                } else {
-                    &value_str
-                };
-                *freq_map.entry(grouped_value.to_string()).or_insert(0) += 1;
-            }
-        }
-
-        // Sorting the frequency map
-        let mut sorted_freq: Vec<(String, usize)> = freq_map.into_iter().collect();
-        sorted_freq.sort_by(|a, b| b.1.cmp(&a.1));
-
-        // Print the frequencies
-        println!("\nFrequency for column '{}':", self.headers[col_idx]);
-        for (value, count) in sorted_freq {
-            println!("{}: {}", value, count);
-        }
+        self
     }
-
-    self
-}
-
 
     /// Sorts the CSV data based on specified column orders.
     pub fn cascade_sort<'a>(&'a mut self, orders: Vec<(&'a str, &'a str)>) -> &'a mut Self {
@@ -1023,7 +1030,6 @@ pub fn print_freq_mapped(&mut self, columns_with_groupings: Vec<(&str, Vec<(&str
         }
     }
 
-    
     /// Returns a HashMap where keys are column names and values are vectors of sorted (value, frequency) pairs.
     pub fn get_freq(&mut self, columns: Vec<&str>) -> HashMap<String, Vec<(String, usize)>> {
         let mut results = HashMap::new();
@@ -1051,57 +1057,59 @@ pub fn print_freq_mapped(&mut self, columns_with_groupings: Vec<(&str, Vec<(&str
         }
 
         results
-    } 
-    
-
-    pub fn get_freq_mapped(&mut self, columns_with_groupings: Vec<(&str, Vec<(&str, Vec<&str>)>)>) -> HashMap<String, Vec<(String, usize)>> {
-    let mut results = HashMap::new();
-
-    for (col, groupings) in columns_with_groupings {
-        let col_idx = if let Some(index) = self.headers.iter().position(|r| r == col) {
-            index
-        } else {
-            println!("Column '{}' not found.", col);
-            continue;
-        };
-
-        let mut value_map: HashMap<String, String> = HashMap::new();
-        let mut apply_groupings = true;
-
-        for (primary_value, values) in groupings {
-            if primary_value == "NO_GROUPINGS" {
-                apply_groupings = false;
-                break;
-            }
-            for value in values {
-                value_map.insert(value.to_string(), primary_value.to_string());
-            }
-        }
-
-        let mut freq_map: HashMap<String, usize> = HashMap::new();
-
-        // Count the frequency of each unique value
-        for row in &self.data {
-            if let Some(value) = row.get(col_idx) {
-                let value_str = value.to_string();
-                let grouped_value = if apply_groupings {
-                    value_map.get(&value_str).unwrap_or(&value_str)
-                } else {
-                    &value_str
-                };
-                *freq_map.entry(grouped_value.to_string()).or_insert(0) += 1;
-            }
-        }
-
-        // Sorting the frequency map
-        let mut sorted_freq: Vec<(String, usize)> = freq_map.into_iter().collect();
-        sorted_freq.sort_by(|a, b| b.1.cmp(&a.1));
-
-        results.insert(col.to_string(), sorted_freq);
     }
 
-    results
-}
+    pub fn get_freq_mapped(
+        &mut self,
+        columns_with_groupings: Vec<(&str, Vec<(&str, Vec<&str>)>)>,
+    ) -> HashMap<String, Vec<(String, usize)>> {
+        let mut results = HashMap::new();
+
+        for (col, groupings) in columns_with_groupings {
+            let col_idx = if let Some(index) = self.headers.iter().position(|r| r == col) {
+                index
+            } else {
+                println!("Column '{}' not found.", col);
+                continue;
+            };
+
+            let mut value_map: HashMap<String, String> = HashMap::new();
+            let mut apply_groupings = true;
+
+            for (primary_value, values) in groupings {
+                if primary_value == "NO_GROUPINGS" {
+                    apply_groupings = false;
+                    break;
+                }
+                for value in values {
+                    value_map.insert(value.to_string(), primary_value.to_string());
+                }
+            }
+
+            let mut freq_map: HashMap<String, usize> = HashMap::new();
+
+            // Count the frequency of each unique value
+            for row in &self.data {
+                if let Some(value) = row.get(col_idx) {
+                    let value_str = value.to_string();
+                    let grouped_value = if apply_groupings {
+                        value_map.get(&value_str).unwrap_or(&value_str)
+                    } else {
+                        &value_str
+                    };
+                    *freq_map.entry(grouped_value.to_string()).or_insert(0) += 1;
+                }
+            }
+
+            // Sorting the frequency map
+            let mut sorted_freq: Vec<(String, usize)> = freq_map.into_iter().collect();
+            sorted_freq.sort_by(|a, b| b.1.cmp(&a.1));
+
+            results.insert(col.to_string(), sorted_freq);
+        }
+
+        results
+    }
 
     /// Removes duplicate rows from the CSV data. This method ensures that only unique rows are retained in the `CsvBuilder`.
     pub fn remove_duplicates(&mut self) -> &mut Self {
@@ -1525,6 +1533,156 @@ pub fn print_freq_mapped(&mut self, columns_with_groupings: Vec<(&str, Vec<(&str
 
         self
     }
+
+    /// Appends derivative columns based on specified computations.
+    pub fn append_derivative_columns(&mut self, columns: Vec<(&str, &str)>) -> &mut Self {
+        if self.error.is_some() {
+            return self;
+        }
+
+        let headers = self.headers.clone();
+
+        for (name, computation) in columns {
+            let new_column_index = self.headers.len();
+            self.headers.push(name.to_string());
+
+            for row in &mut self.data {
+                // Use the standalone function
+                let result = apply_computation(row, computation, &headers);
+                // Convert the boolean result to '1' or '0'
+                let result_str = if result { "1" } else { "0" };
+                row.push(result_str.to_string());
+            }
+        }
+
+        self
+    }
+}
+
+fn apply_computation(row: &Vec<String>, computation: &str, headers: &[String]) -> bool {
+    // Helper function to evaluate a single condition
+
+    fn evaluate_condition(row: &Vec<String>, condition: &str, headers: &[String]) -> bool {
+        // Splitting the condition into parts based on the operator
+        let (operator, parts) = if condition.contains("==") {
+            ("==", condition.splitn(2, "==").collect::<Vec<_>>())
+        } else if condition.contains("!=") {
+            ("!=", condition.splitn(2, "!=").collect::<Vec<_>>())
+        } else if condition.contains(">=") {
+            (">=", condition.splitn(2, ">=").collect::<Vec<_>>())
+        } else if condition.contains("<=") {
+            ("<=", condition.splitn(2, "<=").collect::<Vec<_>>())
+        } else if condition.contains(">") {
+            (">", condition.splitn(2, ">").collect::<Vec<_>>())
+        } else if condition.contains("<") {
+            ("<", condition.splitn(2, "<").collect::<Vec<_>>())
+        } else {
+            return false; // Invalid operator
+        };
+
+        // Ensuring the condition is split into exactly two parts
+        if parts.len() != 2 {
+            return false; // Invalid format
+        }
+
+        let column_name = parts[0].trim();
+
+        // Finding the indices of the first '<' and the following '>'
+        let start_index = parts[1].find('{').unwrap_or(0) + 1;
+        let end_index = parts[1][start_index..].find('}').unwrap_or(parts[1].len()) + start_index;
+
+        // Extracting the value string based on the identified indices
+        let value_str = &parts[1][start_index..end_index].trim();
+
+        dbg!(&condition);
+        // Printing the entire condition for debugging
+        println!(
+            "Evaluating condition: {}, Column: {}, Value: {}",
+            condition, column_name, value_str
+        );
+
+        let result = headers
+            .iter()
+            .position(|r| r == column_name)
+            .and_then(|col_idx| {
+                row.get(col_idx).map(|row_value| match operator {
+                    "==" => row_value == value_str,
+                    "!=" => row_value != value_str,
+                    ">" => row_value > &value_str.to_string(),
+                    "<" => row_value < &value_str.to_string(),
+                    ">=" => row_value >= &value_str.to_string(),
+                    "<=" => row_value <= &value_str.to_string(),
+                    _ => false,
+                })
+            })
+            .unwrap_or(false);
+
+        println!("Condition evaluated: '{}', Result: {}", condition, result);
+        result
+    }
+
+    fn process_condition(row: &Vec<String>, condition: &str, headers: &[String]) -> bool {
+        println!("Processing sub-condition: {}", condition);
+
+        if condition.contains(" AND ") {
+            condition
+                .split(" AND ")
+                .all(|sub_cond| evaluate_condition(row, sub_cond.trim(), headers))
+        } else if condition.contains(" OR ") {
+            condition
+                .split(" OR ")
+                .any(|sub_cond| evaluate_condition(row, sub_cond.trim(), headers))
+        } else {
+            evaluate_condition(row, condition, headers)
+        }
+    }
+
+    fn process_nested(row: &Vec<String>, computation: &str, headers: &[String]) -> bool {
+        let mut nested_level = 0;
+        let mut start = 0;
+        let mut conditions = Vec::new();
+        let mut current_condition = String::new();
+
+        println!("Processing computation: '{}'", computation);
+        for (i, c) in computation.chars().enumerate() {
+            match c {
+                '(' => {
+                    if nested_level == 0 {
+                        start = i + 1;
+                    }
+                    nested_level += 1;
+                }
+                ')' => {
+                    nested_level -= 1;
+                    if nested_level == 0 {
+                        let nested_cond = computation[start..i].trim();
+                        if !nested_cond.is_empty() {
+                            conditions.push(nested_cond.to_string());
+                        }
+                    }
+                }
+                _ if nested_level == 0 => current_condition.push(c),
+                _ => (),
+            }
+        }
+
+        if !current_condition.is_empty() {
+            conditions.push(current_condition.trim().to_string());
+        }
+
+        conditions.iter().all(|cond| {
+            if cond.contains(" AND ") || cond.contains(" OR ") {
+                process_condition(row, cond, headers)
+            } else {
+                evaluate_condition(row, cond, headers)
+            }
+        })
+    }
+
+    // Start processing
+    let result = process_nested(row, computation, headers);
+    println!("Final result of computation: {}", result);
+    result
 }
 
 /// Represents a caching mechanism for CSV results, holding a data generator, cache path, and cache duration.

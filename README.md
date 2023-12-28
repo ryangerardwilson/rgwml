@@ -215,8 +215,16 @@ Example 2: Load from an existing file
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:LEFT_JOIN_AT{{Column1}}") // Left join using "Column1" as the join column.
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
 
-    // L. Save
+    // L. Append Derivative Columns
+    .append_derivative_columns(vec![
+        ("IS_CUSTOMER", "Column1 == {Has paid} OR Column2 == {Has Ordered}"),
+        ("IS_PROSPECT", "Column1 != {Has paid} AND (Column2 != {Has Ordered} AND Column3 != {Has been pitched})"),
+        ("IS_BIG_SPENDING_CUSTOMER", "Column7 > {10000} AND Column8 == {Subscription Active}")
+        ]) // Values need to be placed in {} tags instead of quotations. If the cell content contains the {} characters, you may need to replace them using .replace_all(vec!["Column1", "Column2"], vec![("{", "["), ("}", "]")]) before applying this method
+
+    // M. Save
     .save_as("/path/to/your/file2.csv")
+
 
 
 #### Extract Data
