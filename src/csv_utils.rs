@@ -1543,7 +1543,7 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         let headers = self.headers.clone();
 
         for (name, computation) in columns {
-            let new_column_index = self.headers.len();
+            let _new_column_index = self.headers.len();
             self.headers.push(name.to_string());
 
             for row in &mut self.data {
