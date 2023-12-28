@@ -188,6 +188,14 @@ Example 2: Load from an existing file
     .print_rows()
     .print_unique("column_name")
     .print_freq(vec!["Column1", "Column2"])
+    .print_freq_mapped(vec![
+            ("Column1", vec![
+                ("Delhi", vec!["New Delhi", "Delhi"]),
+                ("UP", vec!["Ghaziabad", "Noida"])
+            ]),
+            ("Column2", vec![("NO_GROUPINGS", vec![])])
+        ])
+
 
     // I. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
@@ -210,7 +218,9 @@ Example 2: Load from an existing file
     // L. Save
     .save_as("/path/to/your/file2.csv")
 
+
 #### Extract Data
+
 
 These methods return a CsvBuilder object, and hence, can not be subsequently chained.
 
@@ -219,6 +229,13 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
     .get_unique("column_name"); // Returns a Vec<String>
     .get("column_name"); // Returns cell content as a String, if the csv has been filtered to single row.
     .get_freq(vec!["Column1", Column2]) // Returns a HashMap where keys are column names and values are vectors of sorted (value, frequency) pairs.
+    .get_freq_mapped(vec![
+            ("Column1", vec![
+                ("Delhi", vec!["New Delhi", "Delhi"]),
+                ("UP", vec!["Ghaziabad", "Noida"])
+            ]),
+            ("Column2", vec![("NO_GROUPINGS", vec![])])
+        ])
 
 ### CsvResultCacher
 

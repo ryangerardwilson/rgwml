@@ -306,6 +306,14 @@ Example 2: Load from an existing file
     .print_rows()
     .print_unique("column_name")
     .print_freq(vec!["Column1", "Column2"])
+    .print_freq_mapped(vec![
+            ("Column1", vec![
+                ("Delhi", vec!["New Delhi", "Delhi"]),
+                ("UP", vec!["Ghaziabad", "Noida"])
+            ]),
+            ("Column2", vec![("NO_GROUPINGS", vec![])])
+        ])
+
 
     // I. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
@@ -338,6 +346,14 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
     .get_unique("column_name"); // Returns a Vec<String>
     .get("column_name"); // Returns cell content as a String, if the csv has been filtered to single row.
     .get_freq(vec!["Column1", Column2]) // Returns a HashMap where keys are column names and values are vectors of sorted (value, frequency) pairs.
+    .get_freq_mapped(vec![
+            ("Column1", vec![
+                ("Delhi", vec!["New Delhi", "Delhi"]),
+                ("UP", vec!["Ghaziabad", "Noida"])
+            ]),
+            ("Column2", vec![("NO_GROUPINGS", vec![])])
+        ])
+
 
 "#;
         // docs.to_string();
@@ -698,6 +714,58 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
     }
 
 
+pub fn print_freq_mapped(&mut self, columns_with_groupings: Vec<(&str, Vec<(&str, Vec<&str>)>)>) -> &mut Self {
+    for (col, groupings) in columns_with_groupings {
+        let col_idx = if let Some(index) = self.headers.iter().position(|r| r == col) {
+            index
+        } else {
+            println!("Column '{}' not found.", col);
+            continue;
+        };
+
+        let mut value_map: HashMap<String, String> = HashMap::new();
+        let mut apply_groupings = true;
+
+        for (primary_value, values) in groupings {
+            if primary_value == "NO_GROUPINGS" {
+                apply_groupings = false;
+                break;
+            }
+            for value in values {
+                value_map.insert(value.to_string(), primary_value.to_string());
+            }
+        }
+
+        let mut freq_map: HashMap<String, usize> = HashMap::new();
+
+        // Count the frequency of each unique value
+        for row in &self.data {
+            if let Some(value) = row.get(col_idx) {
+                let value_str = value.to_string();
+                let grouped_value = if apply_groupings {
+                    value_map.get(&value_str).unwrap_or(&value_str)
+                } else {
+                    &value_str
+                };
+                *freq_map.entry(grouped_value.to_string()).or_insert(0) += 1;
+            }
+        }
+
+        // Sorting the frequency map
+        let mut sorted_freq: Vec<(String, usize)> = freq_map.into_iter().collect();
+        sorted_freq.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Print the frequencies
+        println!("\nFrequency for column '{}':", self.headers[col_idx]);
+        for (value, count) in sorted_freq {
+            println!("{}: {}", value, count);
+        }
+    }
+
+    self
+}
+
+
     /// Sorts the CSV data based on specified column orders.
     pub fn cascade_sort<'a>(&'a mut self, orders: Vec<(&'a str, &'a str)>) -> &'a mut Self {
         // pub fn cascade_sort(mut self, orders: Vec<(&str, &str)>) -> &mut Self {
@@ -955,6 +1023,7 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         }
     }
 
+    
     /// Returns a HashMap where keys are column names and values are vectors of sorted (value, frequency) pairs.
     pub fn get_freq(&mut self, columns: Vec<&str>) -> HashMap<String, Vec<(String, usize)>> {
         let mut results = HashMap::new();
@@ -982,7 +1051,57 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         }
 
         results
-    }    
+    } 
+    
+
+    pub fn get_freq_mapped(&mut self, columns_with_groupings: Vec<(&str, Vec<(&str, Vec<&str>)>)>) -> HashMap<String, Vec<(String, usize)>> {
+    let mut results = HashMap::new();
+
+    for (col, groupings) in columns_with_groupings {
+        let col_idx = if let Some(index) = self.headers.iter().position(|r| r == col) {
+            index
+        } else {
+            println!("Column '{}' not found.", col);
+            continue;
+        };
+
+        let mut value_map: HashMap<String, String> = HashMap::new();
+        let mut apply_groupings = true;
+
+        for (primary_value, values) in groupings {
+            if primary_value == "NO_GROUPINGS" {
+                apply_groupings = false;
+                break;
+            }
+            for value in values {
+                value_map.insert(value.to_string(), primary_value.to_string());
+            }
+        }
+
+        let mut freq_map: HashMap<String, usize> = HashMap::new();
+
+        // Count the frequency of each unique value
+        for row in &self.data {
+            if let Some(value) = row.get(col_idx) {
+                let value_str = value.to_string();
+                let grouped_value = if apply_groupings {
+                    value_map.get(&value_str).unwrap_or(&value_str)
+                } else {
+                    &value_str
+                };
+                *freq_map.entry(grouped_value.to_string()).or_insert(0) += 1;
+            }
+        }
+
+        // Sorting the frequency map
+        let mut sorted_freq: Vec<(String, usize)> = freq_map.into_iter().collect();
+        sorted_freq.sort_by(|a, b| b.1.cmp(&a.1));
+
+        results.insert(col.to_string(), sorted_freq);
+    }
+
+    results
+}
 
     /// Removes duplicate rows from the CSV data. This method ensures that only unique rows are retained in the `CsvBuilder`.
     pub fn remove_duplicates(&mut self) -> &mut Self {
