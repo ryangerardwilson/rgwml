@@ -10,6 +10,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
+use std::fmt::Debug;
+use std::fmt::Display;
 use std::fs;
 use std::fs::File;
 use std::pin::Pin;
@@ -101,6 +103,20 @@ impl CsvConverter {
         wtr.flush()?;
         Ok(())
     }
+}
+
+#[derive(Debug)]
+pub enum ExpVal<'a> {
+    STR(&'a str),
+    VEC(Vec<&'a str>),
+}
+
+#[derive(Debug)]
+pub struct Exp<'a> {
+    pub column: &'a str,
+    pub operator: &'a str,
+    pub compare_with: ExpVal<'a>,
+    pub compare_as: &'a str,
 }
 
 /// Defines the trait for comparison values
@@ -245,18 +261,48 @@ Example 2: Load from an existing file
 2. Manipulating a CsvBuilder Object for Analysis or Saving
 ----------------------------------------------------------
 
-    use rgwml::csv_utils::CsvBuilder;
+    use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
 
     let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
         .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
         .drop_columns(vec!["UNUSED_COLUMN"])
         .cascade_sort(vec![("COLUMN", "ASC")])
-        .where_("address","FUZZ_MIN_SCORE_70",vec!["new delhi","jerusalem"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
+        .where_(
+            vec![
+                ("Exp1", Exp {
+                    column: "customer_type",
+                    operator: "==",
+                    compare_with: ExpVal::STR("REGULAR"),
+                    compare_as: "COMPARE_AS_TEXT"
+                }),
+                ("Exp2", Exp {
+                    column: "invoice_data",
+                    operator: ">",
+                    compare_with: ExpVal::STR("2023-12-31 23:59:59"),
+                    compare_as: "COMPARE_AS_TEXT"
+                }),
+                ("Exp3", Exp {
+                    column: "invoice_amount",
+                    operator: "<",
+                    compare_with: ExpVal::STR("1000"),
+                    compare_as: "COMPARE_AS_NUMBERS"
+                }),
+                ("Exp4", Exp {
+                    column: "address",
+                    operator: "FUZZ_MIN_SCORE_60",
+                    compare_with: ExpVal::VEC(vec!["public school"]),
+                    compare_as: "COMPARE_AS_TEXT"
+                })
+            ],
+            "Exp1 && (Exp2 || Exp3) && Exp4",
+        )
         .print_row_count()
         .save_as("/path/to/modified/file.csv");
 
 3. Chainable Options
 --------------------
+
+    use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
     // A. Setting and adding headers
@@ -288,14 +334,59 @@ Example 2: Load from an existing file
     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
     
     // G. Applying conditional operations
-    .where_("column1", "==", "42", "COMPARE_AS_NUMBERS")
-    .where_("column1", "==", "hello", "COMPARE_AS_TEXT")
-    .where_("column1", "CONTAINS", "apples", "COMPARE_AS_TEXT")
-    .where_("column1", "DOES_NOT_CONTAIN", "apples", "COMPARE_AS_TEXT")
-    .where_("column1", "STARTS_WITH", "discounted", "COMPARE_AS_TEXT")
-    .where_("stated_locality_address","FUZZ_MIN_SCORE_90",vec!["Shastri park","kamal nagar"], "COMPARE_AS_TEXT")
-    .where_("column1", ">", "23-01-01", "COMPARE_AS_TIMESTAMPS")
-    .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting")
+    .where_(
+        vec![
+            ("Exp1", Exp {
+                column: "customer_type",
+                operator: "==",
+                compare_with: ExpVal::STR("REGULAR"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp2", Exp {
+                column: "invoice_data",
+                operator: ">",
+                compare_with: ExpVal::STR("2023-12-31 23:59:59"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp3", Exp {
+                column: "invoice_amount",
+                operator: "<",
+                compare_with: ExpVal::STR("1000"),
+                compare_as: "COMPARE_AS_NUMBERS"
+            }),
+            ("Exp4", Exp {
+                column: "address",
+                operator: "FUZZ_MIN_SCORE_60",
+                compare_with: ExpVal::VEC(vec!["public school"]),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp5", Exp {
+                column: "status",
+                operator: "CONTAINS",
+                compare_with: ExpVal::STR("REJECTED"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp6", Exp {
+                column: "status",
+                operator: "DOES_NOT_CONTAIN",
+                compare_with: ExpVal::STR("HAS NOT PAID"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp7", Exp {
+                column: "status",
+                operator: "STARTS_WITH",
+                compare_with: ExpVal::STR("VERIFIED"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+        ],
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
+    .where_set(
+        vec![
+            // Same as .where() 
+        ],
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7",
+        "Column10",
+        "IS OKAY")
 
     // H. Analytical Prints for data inspection
     .print_columns()
@@ -334,11 +425,12 @@ Example 2: Load from an existing file
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
 
     // L. Append Derivative Columns
-    .append_derivative_columns(vec![
-        ("IS_CUSTOMER", "Column1 == {Has paid} OR Column2 == {Has Ordered}"),
-        ("IS_PROSPECT", "Column1 != {Has paid} AND (Column2 != {Has Ordered} AND Column3 != {Has been pitched})"),
-        ("IS_BIG_SPENDING_CUSTOMER", "Column7 > {10000} AND Column8 == {Subscription Active}")
-        ]) // Values need to be placed in {} tags instead of quotations. If the cell content contains the {} characters, you may need to replace them using .replace_all(vec!["Column1", "Column2"], vec![("{", "["), ("}", "]")]) before applying this method
+    .append_derived_boolean_column(
+        "IS_QUALIFIED_FOR_COUPON",
+        vec![
+            // Same as .where() 
+        ],
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
 
     // M. Save
     .save_as("/path/to/your/file2.csv")
@@ -515,6 +607,11 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
     pub fn add_column_header(&mut self, column_name: &str) -> &mut Self {
         if self.error.is_none() {
             self.headers.push(column_name.to_string());
+
+            // Initialize the values of the new column to empty strings for existing rows
+            for row in &mut self.data {
+                row.push("".to_string());
+            }
         }
         self
     }
@@ -524,6 +621,13 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         if self.error.is_none() {
             for &column_name in column_names.iter() {
                 self.headers.push(column_name.to_string());
+            }
+
+            // Initialize the values of the new columns to empty strings for existing rows
+            for row in &mut self.data {
+                for _ in &column_names {
+                    row.push("".to_string());
+                }
             }
         }
 
@@ -854,66 +958,126 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         self
     }
 
-    /// Filters the rows based on a column name, condition, value, and comparison type.
-    pub fn where_<T: CompareValue>(
-        &mut self,
-        column_name: &str,
-        operation: &str,
-        value: T, // Accepts any type that implements CompareValue
-        compare_as: &str,
-    ) -> &mut Self {
-        if let Some(column_index) = self.headers.iter().position(|h| h == column_name) {
-            let original_data = std::mem::replace(&mut self.data, Vec::new());
+    pub fn where_(&mut self, expressions: Vec<(&str, Exp)>, result_expression: &str) -> &mut Self {
+        // Clone headers and data to avoid borrowing issues
+        let headers_clone = self.headers.clone();
+        let data_clone = self.data.clone();
 
-            let filtered_data = original_data
-                .into_iter()
-                .filter(|row| {
-                    if let Some(cell_value) = row.get(column_index) {
-                        value.apply(cell_value, operation, compare_as)
+        // First, drain the data to get ownership of the rows
+        let mut drained_data = self.data.drain(..).collect::<Vec<_>>();
+
+        // Filter data based on the given expressions
+        let filtered_data = drained_data
+            .drain(..)
+            .filter(|row| {
+                let mut expr_results = HashMap::new();
+                expr_results.insert("true", true);
+                expr_results.insert("false", false);
+
+                // Evaluate each expression
+                for (expr_name, exp) in &expressions {
+                    if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                        if let Some(cell_value) = row.get(column_index) {
+                            let result = match &exp.compare_with {
+                                ExpVal::STR(value_str) => {
+                                    value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                }
+                                ExpVal::VEC(values) => {
+                                    values.apply(cell_value, exp.operator, exp.compare_as)
+                                }
+                            };
+                            expr_results.insert(*expr_name, result);
+                        } else {
+                            expr_results.insert(*expr_name, false);
+                        }
                     } else {
-                        false
+                        println!("Column '{}' not found in headers.", exp.column);
+                        expr_results.insert(*expr_name, false);
                     }
-                })
-                .collect();
+                }
 
-            self.data = filtered_data;
-        } else {
-            println!("Column '{}' not found in headers.", column_name);
-        }
+                // Evaluate the final result expression and filter rows where it is true
+                let result = self.evaluate_result_expression(&expr_results, result_expression);
+                dbg!(&expr_results, result_expression, &result);
+                result
+            })
+            .collect();
+
+        // dbg!(&filtered_data);
+        self.data = filtered_data;
+
         self
     }
 
-    /// Sets a column's value based on a condition applied to a different column.
-    pub fn where_set<T: CompareValue>(
+    pub fn where_set(
         &mut self,
-        filter_column_name: &str,
-        operation: &str,
-        value: T, // Value to check against in the filter column.
-        compare_as: &str,
-        set_column_name: &str,
-        set_value: &str, // Value to set in the target column.
+        conditions: Vec<(&str, Exp)>,
+        logical_expression: &str,
+        target_column: &str,
+        set_value: &str,
     ) -> &mut Self {
-        if let Some(filter_column_index) = self.headers.iter().position(|h| h == filter_column_name)
-        {
-            if let Some(set_column_index) = self.headers.iter().position(|h| h == set_column_name) {
-                self.data.iter_mut().for_each(|row| {
-                    if let Some(cell_value) = row.get(filter_column_index) {
-                        if value.apply(cell_value, operation, compare_as) {
-                            if let Some(target) = row.get_mut(set_column_index) {
-                                *target = set_value.to_string();
-                            }
-                        }
-                    }
-                });
-            } else {
-                println!("Set column '{}' not found in headers.", set_column_name);
-            }
-        } else {
-            println!(
-                "Filter column '{}' not found in headers.",
-                filter_column_name
-            );
+        if conditions.is_empty() {
+            // No conditions provided, do nothing
+            return self;
         }
+
+        // Clone headers to avoid borrowing issues
+        let headers_clone = self.headers.clone();
+
+        // Move self.data out temporarily to avoid borrow conflicts
+        let mut data_clone = std::mem::replace(&mut self.data, vec![]);
+
+        // Iterate through rows and apply conditions
+        data_clone.iter_mut().for_each(|row| {
+            // Evaluate each condition
+            let mut condition_results = HashMap::new();
+            condition_results.insert("true", true);
+            condition_results.insert("false", false);
+
+            for (cond_name, condition) in &conditions {
+                if let Some(column_index) = headers_clone.iter().position(|h| h == condition.column)
+                {
+                    if let Some(cell_value) = row.get(column_index) {
+                        let result = match &condition.compare_with {
+                            ExpVal::STR(value_str) => value_str.apply(
+                                cell_value,
+                                condition.operator,
+                                condition.compare_as,
+                            ),
+                            ExpVal::VEC(values) => {
+                                values.apply(cell_value, condition.operator, condition.compare_as)
+                            }
+                        };
+                        condition_results.insert(*cond_name, result);
+                    } else {
+                        println!("Column '{}' not found in headers.", condition.column);
+                        condition_results.insert(*cond_name, false);
+                    }
+                } else {
+                    println!("Column '{}' not found in headers.", condition.column);
+                    condition_results.insert(*cond_name, false);
+                }
+            }
+
+            // Evaluate the logical expression to determine whether to set the value
+            let eval_result =
+                self.evaluate_result_expression(&condition_results, logical_expression);
+            if eval_result {
+                if let Some(target_column_index) =
+                    headers_clone.iter().position(|h| h == target_column)
+                {
+                    if let Some(target) = row.get_mut(target_column_index) {
+                        *target = set_value.to_string();
+                    }
+                } else {
+                    println!("Target column '{}' not found in headers.", target_column);
+                }
+            }
+        });
+
+        // Replace self.data with the modified data_clone
+        self.data = data_clone;
+
         self
     }
 
@@ -1534,155 +1698,107 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         self
     }
 
-    /// Appends derivative columns based on specified computations.
-    pub fn append_derivative_columns(&mut self, columns: Vec<(&str, &str)>) -> &mut Self {
-        if self.error.is_some() {
-            return self;
-        }
+    pub fn append_derived_boolean_column(
+        &mut self,
+        new_column_name: &str,
+        expressions: Vec<(&str, Exp)>,
+        result_expression: &str,
+    ) -> &mut Self {
+        // Add new column header
+        self.headers.push(new_column_name.to_string());
 
-        let headers = self.headers.clone();
+        // Clone headers to avoid borrowing issues
+        let headers_clone = self.headers.clone();
 
-        for (name, computation) in columns {
-            let _new_column_index = self.headers.len();
-            self.headers.push(name.to_string());
+        // Create a new vector to hold the updated data
+        let mut updated_data = Vec::new();
 
-            for row in &mut self.data {
-                // Use the standalone function
-                let result = apply_computation(row, computation, &headers);
-                // Convert the boolean result to '1' or '0'
-                let result_str = if result { "1" } else { "0" };
-                row.push(result_str.to_string());
+        // Iterate over each row
+        for row in &self.data {
+            let mut expr_results = HashMap::new();
+            expr_results.insert("true", true);
+            expr_results.insert("false", false);
+
+            // Evaluate each expression
+            for (expr_name, exp) in &expressions {
+                if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                    if let Some(cell_value) = row.get(column_index) {
+                        let result = match &exp.compare_with {
+                            ExpVal::STR(value_str) => {
+                                value_str.apply(cell_value, exp.operator, exp.compare_as)
+                            }
+                            ExpVal::VEC(values) => {
+                                values.apply(cell_value, exp.operator, exp.compare_as)
+                            }
+                        };
+                        expr_results.insert(*expr_name, result);
+                    }
+                }
             }
+
+            // Evaluate the final result expression and append to the row
+            let final_result = self.evaluate_result_expression(&expr_results, result_expression);
+            let mut row_clone = row.clone();
+            row_clone.push(final_result.to_string());
+            updated_data.push(row_clone);
         }
+
+        // Replace the original data with the updated data
+        self.data = updated_data;
 
         self
     }
-}
 
-fn apply_computation(row: &Vec<String>, computation: &str, headers: &[String]) -> bool {
-    // Helper function to evaluate a single condition
+    fn evaluate_result_expression(
+        &self,
+        expr_results: &HashMap<&str, bool>,
+        result_expression: &str,
+    ) -> bool {
+        let mut expression = result_expression.to_string();
 
-    fn evaluate_condition(row: &Vec<String>, condition: &str, headers: &[String]) -> bool {
-        // Splitting the condition into parts based on the operator
-        let (operator, parts) = if condition.contains("==") {
-            ("==", condition.splitn(2, "==").collect::<Vec<_>>())
-        } else if condition.contains("!=") {
-            ("!=", condition.splitn(2, "!=").collect::<Vec<_>>())
-        } else if condition.contains(">=") {
-            (">=", condition.splitn(2, ">=").collect::<Vec<_>>())
-        } else if condition.contains("<=") {
-            ("<=", condition.splitn(2, "<=").collect::<Vec<_>>())
-        } else if condition.contains(">") {
-            (">", condition.splitn(2, ">").collect::<Vec<_>>())
-        } else if condition.contains("<") {
-            ("<", condition.splitn(2, "<").collect::<Vec<_>>())
-        } else {
-            return false; // Invalid operator
-        };
-
-        // Ensuring the condition is split into exactly two parts
-        if parts.len() != 2 {
-            return false; // Invalid format
-        }
-
-        let column_name = parts[0].trim();
-
-        // Finding the indices of the first '<' and the following '>'
-        let start_index = parts[1].find('{').unwrap_or(0) + 1;
-        let end_index = parts[1][start_index..].find('}').unwrap_or(parts[1].len()) + start_index;
-
-        // Extracting the value string based on the identified indices
-        let value_str = &parts[1][start_index..end_index].trim();
-
-        dbg!(&condition);
-        // Printing the entire condition for debugging
-        println!(
-            "Evaluating condition: {}, Column: {}, Value: {}",
-            condition, column_name, value_str
-        );
-
-        let result = headers
-            .iter()
-            .position(|r| r == column_name)
-            .and_then(|col_idx| {
-                row.get(col_idx).map(|row_value| match operator {
-                    "==" => row_value == value_str,
-                    "!=" => row_value != value_str,
-                    ">" => row_value > &value_str.to_string(),
-                    "<" => row_value < &value_str.to_string(),
-                    ">=" => row_value >= &value_str.to_string(),
-                    "<=" => row_value <= &value_str.to_string(),
-                    _ => false,
-                })
-            })
-            .unwrap_or(false);
-
-        println!("Condition evaluated: '{}', Result: {}", condition, result);
-        result
-    }
-
-    fn process_condition(row: &Vec<String>, condition: &str, headers: &[String]) -> bool {
-        println!("Processing sub-condition: {}", condition);
-
-        if condition.contains(" AND ") {
-            condition
-                .split(" AND ")
-                .all(|sub_cond| evaluate_condition(row, sub_cond.trim(), headers))
-        } else if condition.contains(" OR ") {
-            condition
-                .split(" OR ")
-                .any(|sub_cond| evaluate_condition(row, sub_cond.trim(), headers))
-        } else {
-            evaluate_condition(row, condition, headers)
-        }
-    }
-
-    fn process_nested(row: &Vec<String>, computation: &str, headers: &[String]) -> bool {
-        let mut nested_level = 0;
-        let mut start = 0;
-        let mut conditions = Vec::new();
-        let mut current_condition = String::new();
-
-        println!("Processing computation: '{}'", computation);
-        for (i, c) in computation.chars().enumerate() {
-            match c {
-                '(' => {
-                    if nested_level == 0 {
-                        start = i + 1;
-                    }
-                    nested_level += 1;
-                }
-                ')' => {
-                    nested_level -= 1;
-                    if nested_level == 0 {
-                        let nested_cond = computation[start..i].trim();
-                        if !nested_cond.is_empty() {
-                            conditions.push(nested_cond.to_string());
+        let evaluate_simple_expr = |expr: &str, expr_results: &HashMap<&str, bool>| -> bool {
+            // dbg!(&expr, &expr_results);
+            let result = expr
+                .split_whitespace()
+                .fold((None, None), |(acc, last_op), token| match token {
+                    "&&" => (acc, Some("&&")),
+                    "||" => (acc, Some("||")),
+                    _ => {
+                        let expr_result = *expr_results.get(token).unwrap_or(&false);
+                        match (acc, last_op) {
+                            (None, _) => (Some(expr_result), None),
+                            (Some(acc_value), Some("&&")) => (Some(acc_value && expr_result), None),
+                            (Some(acc_value), Some("||")) => (Some(acc_value || expr_result), None),
+                            _ => (acc, None),
                         }
                     }
+                })
+                .0
+                .unwrap_or(false);
+            //dbg!(&result);
+            result
+        };
+
+        // Function to extract and evaluate expressions within round brackets
+        let process_brackets = |expr: &mut String, expr_results: &HashMap<&str, bool>| {
+            while let Some(start) = expr.find('(') {
+                if let Some(end) = expr[start..].find(')') {
+                    let inner_expr = &expr[start + 1..start + end];
+                    let result = evaluate_simple_expr(inner_expr, expr_results); // Evaluate the inner expression
+                                                                                 //dbg!(&expr);
+                    expr.replace_range(start..start + end + 1, &result.to_string());
+                    //dbg!(&expr);
+                    // Replace the evaluated part in the original expression
                 }
-                _ if nested_level == 0 => current_condition.push(c),
-                _ => (),
             }
-        }
+        };
 
-        if !current_condition.is_empty() {
-            conditions.push(current_condition.trim().to_string());
-        }
+        // Process round brackets
+        process_brackets(&mut expression, expr_results);
 
-        conditions.iter().all(|cond| {
-            if cond.contains(" AND ") || cond.contains(" OR ") {
-                process_condition(row, cond, headers)
-            } else {
-                evaluate_condition(row, cond, headers)
-            }
-        })
+        // Evaluate the final expression
+        evaluate_simple_expr(&expression, expr_results)
     }
-
-    // Start processing
-    let result = process_nested(row, computation, headers);
-    println!("Final result of computation: {}", result);
-    result
 }
 
 /// Represents a caching mechanism for CSV results, holding a data generator, cache path, and cache duration.

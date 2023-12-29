@@ -127,18 +127,49 @@ Example 2: Load from an existing file
 
 ####  Manipulating a CsvBuilder Object for Analysis or Saving
 
-    use rgwml::csv_utils::CsvBuilder;
+
+    use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
 
     let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
         .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
         .drop_columns(vec!["UNUSED_COLUMN"])
         .cascade_sort(vec![("COLUMN", "ASC")])
-        .where_("address","FUZZ_MIN_SCORE_70",vec!["new delhi","jerusalem"], "COMPARE_AS_TEXT") // Adjust score value to any two digit number like FUZZ_MIN_SCORE_23, FUZZ_MIN_SCORE_67, etc.
+        .where_(
+            vec![
+                ("Exp1", Exp {
+                    column: "customer_type",
+                    operator: "==",
+                    compare_with: ExpVal::STR("REGULAR"),
+                    compare_as: "COMPARE_AS_TEXT"
+                }),
+                ("Exp2", Exp {
+                    column: "invoice_data",
+                    operator: ">",
+                    compare_with: ExpVal::STR("2023-12-31 23:59:59"),
+                    compare_as: "COMPARE_AS_TEXT"
+                }),
+                ("Exp3", Exp {
+                    column: "invoice_amount",
+                    operator: "<",
+                    compare_with: ExpVal::STR("1000"),
+                    compare_as: "COMPARE_AS_NUMBERS"
+                }),
+                ("Exp4", Exp {
+                    column: "address",
+                    operator: "FUZZ_MIN_SCORE_60",
+                    compare_with: ExpVal::VEC(vec!["public school"]),
+                    compare_as: "COMPARE_AS_TEXT"
+                })
+            ],
+            "Exp1 && (Exp2 || Exp3) && Exp4",
+        )
         .print_row_count()
         .save_as("/path/to/modified/file.csv");
 
 
 #### Chainable Options
+
+    use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
     // A. Setting and adding headers
@@ -170,14 +201,59 @@ Example 2: Load from an existing file
     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
     
     // G. Applying conditional operations
-    .where_("column1", "==", "42", "COMPARE_AS_NUMBERS")
-    .where_("column1", "==", "hello", "COMPARE_AS_TEXT")
-    .where_("column1", "CONTAINS", "apples", "COMPARE_AS_TEXT")
-    .where_("column1", "DOES_NOT_CONTAIN", "apples", "COMPARE_AS_TEXT")
-    .where_("column1", "STARTS_WITH", "discounted", "COMPARE_AS_TEXT")
-    .where_("stated_locality_address","FUZZ_MIN_SCORE_90",vec!["Shastri park","kamal nagar"], "COMPARE_AS_TEXT")
-    .where_("column1", ">", "23-01-01", "COMPARE_AS_TIMESTAMPS")
-    .where_set("column1", "==", "hello", "COMPARE_AS_TEXT", "Column9", "greeting")
+    .where_(
+        vec![
+            ("Exp1", Exp {
+                column: "customer_type",
+                operator: "==",
+                compare_with: ExpVal::STR("REGULAR"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp2", Exp {
+                column: "invoice_data",
+                operator: ">",
+                compare_with: ExpVal::STR("2023-12-31 23:59:59"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp3", Exp {
+                column: "invoice_amount",
+                operator: "<",
+                compare_with: ExpVal::STR("1000"),
+                compare_as: "COMPARE_AS_NUMBERS"
+            }),
+            ("Exp4", Exp {
+                column: "address",
+                operator: "FUZZ_MIN_SCORE_60",
+                compare_with: ExpVal::VEC(vec!["public school"]),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp5", Exp {
+                column: "status",
+                operator: "CONTAINS",
+                compare_with: ExpVal::STR("REJECTED"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp6", Exp {
+                column: "status",
+                operator: "DOES_NOT_CONTAIN",
+                compare_with: ExpVal::STR("HAS NOT PAID"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+            ("Exp7", Exp {
+                column: "status",
+                operator: "STARTS_WITH",
+                compare_with: ExpVal::STR("VERIFIED"),
+                compare_as: "COMPARE_AS_TEXT"
+            }),
+        ],
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
+    .where_set(
+        vec![
+            // Same as .where() 
+        ],
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7",
+        "Column10",
+        "IS OKAY")
 
     // H. Analytical Prints for data inspection
     .print_columns()
@@ -195,7 +271,6 @@ Example 2: Load from an existing file
             ]),
             ("Column2", vec![("NO_GROUPINGS", vec![])])
         ])
-
 
     // I. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
@@ -216,16 +291,15 @@ Example 2: Load from an existing file
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
 
     // L. Append Derivative Columns
-    .append_derivative_columns(vec![
-        ("IS_CUSTOMER", "Column1 == {Has paid} OR Column2 == {Has Ordered}"),
-        ("IS_PROSPECT", "Column1 != {Has paid} AND (Column2 != {Has Ordered} AND Column3 != {Has been pitched})"),
-        ("IS_BIG_SPENDING_CUSTOMER", "Column7 > {10000} AND Column8 == {Subscription Active}")
-        ]) // Values need to be placed in {} tags instead of quotations. If the cell content contains the {} characters, you may need to replace them using .replace_all(vec!["Column1", "Column2"], vec![("{", "["), ("}", "]")]) before applying this method
+    .append_derived_boolean_column(
+        "IS_QUALIFIED_FOR_COUPON",
+        vec![
+            // Same as .where() 
+        ],
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
 
     // M. Save
     .save_as("/path/to/your/file2.csv")
-
-
 
 #### Extract Data
 
