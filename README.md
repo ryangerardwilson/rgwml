@@ -262,6 +262,7 @@ Example 2: Load from an existing file
     .print_last_row()
     .print_rows_range(2,5)
     .print_rows()
+    .print_cells(vec!["Column1", "Column2"])
     .print_unique("column_name")
     .print_freq(vec!["Column1", "Column2"])
     .print_freq_mapped(vec![
@@ -271,6 +272,11 @@ Example 2: Load from an existing file
             ]),
             ("Column2", vec![("NO_GROUPINGS", vec![])])
         ])
+    .print_count_where(
+        vec![
+            // Same as .where()
+        ],
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
 
     // I. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder

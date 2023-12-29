@@ -395,6 +395,7 @@ Example 2: Load from an existing file
     .print_last_row()
     .print_rows_range(2,5)
     .print_rows()
+    .print_cells(vec!["Column1", "Column2"])
     .print_unique("column_name")
     .print_freq(vec!["Column1", "Column2"])
     .print_freq_mapped(vec![
@@ -404,7 +405,11 @@ Example 2: Load from an existing file
             ]),
             ("Column2", vec![("NO_GROUPINGS", vec![])])
         ])
-
+    .print_count_where(
+        vec![
+            // Same as .where()
+        ],
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
 
     // I. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
@@ -786,6 +791,32 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         self
     }
 
+
+/// Prints specified cells for each row of the CSV data.
+pub fn print_cells(&mut self, columns: Vec<&str>) -> &mut Self {
+    println!();
+    // First, determine the indices of the specified columns
+    let column_indices: Vec<Option<usize>> = columns.iter()
+        .map(|&col| self.headers.iter().position(|h| h == col))
+        .collect();
+
+    for row in &self.data {
+        println!();
+        for (col_name, col_index) in columns.iter().zip(&column_indices) {
+            if let Some(index) = col_index {
+                // Safely get the value from the row
+                if let Some(value) = row.get(*index) {
+                    println!("\"{}\": \"{}\",", col_name, value);
+                }
+            } else {
+                println!("\"{}\": column not found,", col_name);
+            }
+        }
+    }
+    self
+}
+
+
     /// Aesthetically prints the frequency of all unique values in the indicated columns, sorted by frequency.
     pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
         let mut column_indices = Vec::new();
@@ -1008,6 +1039,51 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
 
         self
     }
+
+
+/// Prints the count of rows matching the filter criteria.
+pub fn print_count_where(&mut self, expressions: Vec<(&str, Exp)>, result_expression: &str) -> &mut Self {
+    // Use the headers directly since we are not modifying data
+    let headers = &self.headers;
+
+    // Count the number of rows that match the filter
+    let count = self.data.iter().filter(|row| {
+        let mut expr_results = HashMap::new();
+        expr_results.insert("true", true);
+        expr_results.insert("false", false);
+
+        // Evaluate each expression
+        for (expr_name, exp) in &expressions {
+            if let Some(column_index) = headers.iter().position(|h| h == exp.column) {
+                if let Some(cell_value) = row.get(column_index) {
+                    let result = match &exp.compare_with {
+                        ExpVal::STR(value_str) => {
+                            value_str.apply(cell_value, exp.operator, exp.compare_as)
+                        }
+                        ExpVal::VEC(values) => {
+                            values.apply(cell_value, exp.operator, exp.compare_as)
+                        }
+                    };
+                    expr_results.insert(*expr_name, result);
+                } else {
+                    expr_results.insert(*expr_name, false);
+                }
+            } else {
+                println!("Column '{}' not found in headers.", exp.column);
+                expr_results.insert(*expr_name, false);
+            }
+        }
+
+        // Evaluate the final result expression
+        self.evaluate_result_expression(&expr_results, result_expression)
+    }).count();
+
+    // Print the count
+    println!("Count: {}", count);
+
+    self
+}
+
 
     pub fn where_set(
         &mut self,
