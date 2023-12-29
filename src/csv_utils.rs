@@ -998,7 +998,7 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
 
                 // Evaluate the final result expression and filter rows where it is true
                 let result = self.evaluate_result_expression(&expr_results, result_expression);
-                dbg!(&expr_results, result_expression, &result);
+                // dbg!(&expr_results, result_expression, &result);
                 result
             })
             .collect();
