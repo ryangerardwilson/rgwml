@@ -219,6 +219,13 @@ impl CompareValue for Vec<&str> {
     }
 }
 
+pub struct Piv {
+    pub index_at: &'static str,
+    pub values_from: &'static str,
+    pub operation: &'static str,
+    pub seggregate_by: Vec<&'static str>,
+}
+
 /// A flexible builder for creating and writing to CSV files.
 ///
 /// This struct allows for a fluent interface to build and write to a CSV file,
@@ -791,31 +798,30 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         self
     }
 
-
-/// Prints specified cells for each row of the CSV data.
-pub fn print_cells(&mut self, columns: Vec<&str>) -> &mut Self {
-    println!();
-    // First, determine the indices of the specified columns
-    let column_indices: Vec<Option<usize>> = columns.iter()
-        .map(|&col| self.headers.iter().position(|h| h == col))
-        .collect();
-
-    for row in &self.data {
+    /// Prints specified cells for each row of the CSV data.
+    pub fn print_cells(&mut self, columns: Vec<&str>) -> &mut Self {
         println!();
-        for (col_name, col_index) in columns.iter().zip(&column_indices) {
-            if let Some(index) = col_index {
-                // Safely get the value from the row
-                if let Some(value) = row.get(*index) {
-                    println!("\"{}\": \"{}\",", col_name, value);
+        // First, determine the indices of the specified columns
+        let column_indices: Vec<Option<usize>> = columns
+            .iter()
+            .map(|&col| self.headers.iter().position(|h| h == col))
+            .collect();
+
+        for row in &self.data {
+            println!();
+            for (col_name, col_index) in columns.iter().zip(&column_indices) {
+                if let Some(index) = col_index {
+                    // Safely get the value from the row
+                    if let Some(value) = row.get(*index) {
+                        println!("\"{}\": \"{}\",", col_name, value);
+                    }
+                } else {
+                    println!("\"{}\": column not found,", col_name);
                 }
-            } else {
-                println!("\"{}\": column not found,", col_name);
             }
         }
+        self
     }
-    self
-}
-
 
     /// Aesthetically prints the frequency of all unique values in the indicated columns, sorted by frequency.
     pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
@@ -1040,50 +1046,56 @@ pub fn print_cells(&mut self, columns: Vec<&str>) -> &mut Self {
         self
     }
 
+    /// Prints the count of rows matching the filter criteria.
+    pub fn print_count_where(
+        &mut self,
+        expressions: Vec<(&str, Exp)>,
+        result_expression: &str,
+    ) -> &mut Self {
+        // Use the headers directly since we are not modifying data
+        let headers = &self.headers;
 
-/// Prints the count of rows matching the filter criteria.
-pub fn print_count_where(&mut self, expressions: Vec<(&str, Exp)>, result_expression: &str) -> &mut Self {
-    // Use the headers directly since we are not modifying data
-    let headers = &self.headers;
+        // Count the number of rows that match the filter
+        let count = self
+            .data
+            .iter()
+            .filter(|row| {
+                let mut expr_results = HashMap::new();
+                expr_results.insert("true", true);
+                expr_results.insert("false", false);
 
-    // Count the number of rows that match the filter
-    let count = self.data.iter().filter(|row| {
-        let mut expr_results = HashMap::new();
-        expr_results.insert("true", true);
-        expr_results.insert("false", false);
-
-        // Evaluate each expression
-        for (expr_name, exp) in &expressions {
-            if let Some(column_index) = headers.iter().position(|h| h == exp.column) {
-                if let Some(cell_value) = row.get(column_index) {
-                    let result = match &exp.compare_with {
-                        ExpVal::STR(value_str) => {
-                            value_str.apply(cell_value, exp.operator, exp.compare_as)
+                // Evaluate each expression
+                for (expr_name, exp) in &expressions {
+                    if let Some(column_index) = headers.iter().position(|h| h == exp.column) {
+                        if let Some(cell_value) = row.get(column_index) {
+                            let result = match &exp.compare_with {
+                                ExpVal::STR(value_str) => {
+                                    value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                }
+                                ExpVal::VEC(values) => {
+                                    values.apply(cell_value, exp.operator, exp.compare_as)
+                                }
+                            };
+                            expr_results.insert(*expr_name, result);
+                        } else {
+                            expr_results.insert(*expr_name, false);
                         }
-                        ExpVal::VEC(values) => {
-                            values.apply(cell_value, exp.operator, exp.compare_as)
-                        }
-                    };
-                    expr_results.insert(*expr_name, result);
-                } else {
-                    expr_results.insert(*expr_name, false);
+                    } else {
+                        println!("Column '{}' not found in headers.", exp.column);
+                        expr_results.insert(*expr_name, false);
+                    }
                 }
-            } else {
-                println!("Column '{}' not found in headers.", exp.column);
-                expr_results.insert(*expr_name, false);
-            }
-        }
 
-        // Evaluate the final result expression
-        self.evaluate_result_expression(&expr_results, result_expression)
-    }).count();
+                // Evaluate the final result expression
+                self.evaluate_result_expression(&expr_results, result_expression)
+            })
+            .count();
 
-    // Print the count
-    println!("Count: {}", count);
+        // Print the count
+        println!("Count: {}", count);
 
-    self
-}
-
+        self
+    }
 
     pub fn where_set(
         &mut self,
@@ -1874,6 +1886,227 @@ pub fn print_count_where(&mut self, expressions: Vec<(&str, Exp)>, result_expres
 
         // Evaluate the final expression
         evaluate_simple_expr(&expression, expr_results)
+    }
+
+    /*
+    pub fn pivot_as<'a>(&'a mut self, path: &str, piv: Piv) -> &mut Self {
+        let mut pivot_data: HashMap<String, HashMap<String, f64>> = HashMap::new();
+
+        // Find positions of the necessary columns
+        let index_col_pos = match self.headers.iter().position(|x| x == piv.index_at) {
+            Some(pos) => pos,
+            None => {
+                eprintln!("Error: Index column not found");
+                return self;
+            },
+        };
+
+        let value_col_pos = match self.headers.iter().position(|x| x == piv.values_from) {
+            Some(pos) => pos,
+            None => {
+                eprintln!("Error: Value column not found");
+                return self;
+            },
+        };
+
+        let seg_cols_pos: Vec<_> = piv.seggregate_by.iter()
+            .filter_map(|col| self.headers.iter().position(|x| x == col))
+            .collect();
+
+        if seg_cols_pos.len() != piv.seggregate_by.len() {
+            eprintln!("Error: One or more segmentation columns not found");
+            return self;
+        }
+
+        for row in &self.data {
+            if row.len() <= index_col_pos || row.len() <= value_col_pos || seg_cols_pos.iter().any(|&pos| row.len() <= pos) {
+                continue;
+            }
+
+            let index_value = &row[index_col_pos];
+            let value: f64 = row[value_col_pos].parse().unwrap_or(0.0);
+            let seg_values: Vec<&str> = seg_cols_pos.iter().map(|&pos| row[pos].as_str()).collect();
+            let seg_key = if seg_values.is_empty() { String::new() } else { seg_values.join("_") };
+
+            *pivot_data.entry(index_value.to_string()).or_default()
+                       .entry(seg_key).or_default() += value;
+        }
+
+        // Attempt to write pivot data to CSV, print errors if any occur
+        if let Err(e) = (|| -> Result<(), Box<dyn Error>> {
+            let mut writer = csv::Writer::from_path(path)?;
+
+            // Conditionally write headers based on segmentation
+            if seg_cols_pos.is_empty() {
+                writer.write_record(&["Index", "Value"])?;
+            } else {
+                writer.write_record(&["Index", "Segmentation", "Value"])?;
+            }
+
+            for (index, segments) in pivot_data {
+                for (seg, value) in segments {
+                    if seg_cols_pos.is_empty() {
+                        writer.write_record(&[index.clone(), value.to_string()])?;
+                    } else {
+                        writer.write_record(&[index.clone(), seg, value.to_string()])?;
+                    }
+                }
+            }
+
+            writer.flush    let result = match piv.operation {
+            "SUM" => {
+                segments.values().sum::<f64>()
+            },
+            "AVERAGE" => {
+                let sum: f64 = segments.values().sum();
+                let count = segments.len();
+                if count > 0 { sum / count as f64 } else { 0.0 }
+            },
+            "MEDIAN" => {
+                let mut values: Vec<f64> = segments.values().cloned().collect();
+                values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+                if values.is_empty() {
+                    0.0
+                } else if values.len() % 2 == 1 {
+                    values[values.len() / 2]
+                } else {
+                    let mid = values.len() / 2;
+                    (values[mid - 1] + values[mid]) / 2.0
+                }
+            },
+            _ => {
+                eprintln!("Unsupported operation: {}", piv.operation);
+                0.0
+            }
+        };()?;
+            Ok(())
+        })() {
+            eprintln!("Error writing to CSV: {}", e);
+        }
+
+        self
+    }
+    */
+
+    pub fn pivot_as<'a>(&'a mut self, path: &str, piv: Piv) -> &mut Self {
+        //let mut pivot_data: HashMap<String, HashMap<String, f64>> = HashMap::new();
+        let mut pivot_data: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
+
+        // Find positions of the necessary columns
+        let index_col_pos = match self.headers.iter().position(|x| x == piv.index_at) {
+            Some(pos) => pos,
+            None => {
+                eprintln!("Error: Index column not found");
+                return self;
+            }
+        };
+
+        let value_col_pos = match self.headers.iter().position(|x| x == piv.values_from) {
+            Some(pos) => pos,
+            None => {
+                eprintln!("Error: Value column not found");
+                return self;
+            }
+        };
+
+        let seg_cols_pos: Vec<_> = piv
+            .seggregate_by
+            .iter()
+            .filter_map(|col| self.headers.iter().position(|x| x == col))
+            .collect();
+
+        if seg_cols_pos.len() != piv.seggregate_by.len() {
+            eprintln!("Error: One or more segmentation columns not found");
+            return self;
+        }
+
+        for row in &self.data {
+            if row.len() <= index_col_pos
+                || row.len() <= value_col_pos
+                || seg_cols_pos.iter().any(|&pos| row.len() <= pos)
+            {
+                continue;
+            }
+
+            // Define index_value within the loop
+            let index_value = &row[index_col_pos];
+            let value: f64 = row[value_col_pos].parse().unwrap_or(0.0);
+
+            let seg_values: Vec<&str> = seg_cols_pos.iter().map(|&pos| row[pos].as_str()).collect();
+            let seg_key = if seg_values.is_empty() {
+                String::new()
+            } else {
+                seg_values.join("_")
+            };
+
+            pivot_data
+                .entry(index_value.to_string())
+                .or_insert_with(HashMap::new)
+                .entry(seg_key)
+                .or_default()
+                .push(value); // Push individual values instead of summing
+        }
+
+        // Perform operations and write to CSV
+        if let Err(e) = (|| -> Result<(), Box<dyn Error>> {
+            let mut writer = Writer::from_path(path)?;
+
+            // Write headers
+            if seg_cols_pos.is_empty() {
+                writer.write_record(&["Index", "Value"])?;
+            } else {
+                writer.write_record(&["Index", "Segmentation", "Value"])?;
+            }
+
+            for (index, segments) in pivot_data {
+                println!("Operation: {}", piv.operation); // Debugging output
+                dbg!(&segments);
+
+                let result = match piv.operation {
+                    "SUM" => segments.values().flatten().sum::<f64>(),
+                    "MEAN" => {
+                        let sum: f64 = segments.values().flatten().sum();
+                        let count = segments.values().map(|v| v.len()).sum::<usize>();
+                        if count > 0 {
+                            sum / count as f64
+                        } else {
+                            0.0
+                        }
+                    }
+                    "MEDIAN" => {
+                        let mut values: Vec<f64> = segments.values().flatten().cloned().collect();
+                        values.sort_unstable_by(|a, b| {
+                            a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                        });
+                        if values.len() % 2 == 1 {
+                            values[values.len() / 2]
+                        } else {
+                            let mid = values.len() / 2;
+                            (values[mid - 1] + values[mid]) / 2.0
+                        }
+                    }
+                    _ => {
+                        eprintln!("Unsupported operation: {}", piv.operation);
+                        0.0
+                    }
+                };
+
+                dbg!(&result);
+                if seg_cols_pos.is_empty() {
+                    writer.write_record(&[index, result.to_string()])?;
+                } else {
+                    writer.write_record(&[index, "".to_string(), result.to_string()])?;
+                }
+            }
+
+            writer.flush()?;
+            Ok(())
+        })() {
+            eprintln!("Error writing to CSV: {}", e);
+        }
+
+        self
     }
 }
 
