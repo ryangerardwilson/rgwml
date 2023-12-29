@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::Debug;
-use std::fmt::Display;
+// use std::fmt::Display;
 use std::fs;
 use std::fs::File;
 use std::pin::Pin;
@@ -961,7 +961,7 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
     pub fn where_(&mut self, expressions: Vec<(&str, Exp)>, result_expression: &str) -> &mut Self {
         // Clone headers and data to avoid borrowing issues
         let headers_clone = self.headers.clone();
-        let data_clone = self.data.clone();
+        //let data_clone = self.data.clone();
 
         // First, drain the data to get ownership of the rows
         let mut drained_data = self.data.drain(..).collect::<Vec<_>>();
