@@ -1,4 +1,5 @@
 // csv_utils.rs
+use calamine::{open_workbook, Reader, Xls};
 use chrono::{DateTime, NaiveDateTime};
 use csv::Writer;
 use futures::executor::block_on;
@@ -11,9 +12,10 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::Debug;
-// use std::fmt::Display;
 use std::fs;
 use std::fs::File;
+use std::io::Error as IoError;
+use std::io::ErrorKind;
 use std::pin::Pin;
 use std::time::{Duration, SystemTime};
 
@@ -21,58 +23,6 @@ use std::time::{Duration, SystemTime};
 pub struct CsvConverter;
 
 impl CsvConverter {
-    pub fn get_docs() -> String {
-        let docs = r#"
-
-++++++++++++++++++++++++++++++++
-+> CsvConverter Documentation <+
-++++++++++++++++++++++++++++++++
-
-    use serde_json::json;
-    use tokio;
-    use rgwml::csv_utils::CsvConverter;
-    use rgwml::api_utils::ApiCallBuilder;
-
-    // Function to fetch sales data from an API
-    async fn fetch_sales_data_from_api() -> Result<String, Box<dyn std::error::Error>> {
-        let method = "POST";
-        let url = "http://example.com/api/sales"; // API URL to fetch sales data
-
-        // Payload for the API call
-        let payload = json!({
-            "date": "2023-12-21"
-        });
-
-        // Performing the API call
-        let response = ApiCallBuilder::call(method, url, None, Some(payload))
-            .execute()
-            .await?;
-
-        Ok(response)
-    }
-
-    // Main function with tokio's async runtime
-    #[tokio::main]
-    async fn main() {
-        // Fetch sales data and handle potential errors inline
-        let sales_data_response = fetch_sales_data_from_api().await.unwrap_or_else(|e| {
-            eprintln!("Failed to fetch sales data: {}", e);
-            std::process::exit(1); // Exit the program in case of an error
-        });
-
-        // Convert the fetched JSON data to CSV
-        CsvConverter::from_json(&sales_data_response, "path/to/your/file.csv")
-            .expect("Failed to convert JSON to CSV"); // Handle errors in CSV conversion
-    }
-
-"#;
-        // docs.to_string();
-
-        println!("{}", docs.to_string());
-
-        docs.to_string()
-    }
-
     pub fn from_json(json_data: &str, file_path: &str) -> Result<(), Box<dyn Error>> {
         let data: Value = serde_json::from_str(json_data)?;
 
@@ -226,6 +176,11 @@ pub struct Piv {
     pub seggregate_by: Vec<&'static str>,
 }
 
+pub struct CalibConfig {
+    pub header_is_at_row: &'static str,
+    pub rows_range_from: (&'static str, &'static str),
+}
+
 /// A flexible builder for creating and writing to CSV files.
 ///
 /// This struct allows for a fluent interface to build and write to a CSV file,
@@ -239,241 +194,6 @@ pub struct CsvBuilder {
 }
 
 impl CsvBuilder {
-    /// A function to print documentation for easy reference
-    pub fn get_docs() -> String {
-        let docs = r#"
-
-++++++++++++++++++++++++++++++
-+> CsvBuilder Documentation <+
-++++++++++++++++++++++++++++++
-
-1. Instantiation
-----------------
-
-Example 1: Creating a new object
-
-    use rgwml::csv_utils::CsvBuilder;
-
-    let builder = CsvBuilder::new()
-        .set_header(&["Column1", "Column2", "Column3"])
-        .add_rows(&[&["Row1-1", "Row1-2", "Row1-3"], &["Row2-1", "Row2-2", "Row2-3"]])
-        .save_as("/path/to/your/file.csv");
-
-Example 2: Load from an existing file
-
-    use rgwml::csv_utils::CsvBuilder;
-
-    let builder = CsvBuilder::from_csv("/path/to/existing/file.csv");
-
-2. Manipulating a CsvBuilder Object for Analysis or Saving
-----------------------------------------------------------
-
-    use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
-
-    let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
-        .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
-        .drop_columns(vec!["UNUSED_COLUMN"])
-        .cascade_sort(vec![("COLUMN", "ASC")])
-        .where_(
-            vec![
-                ("Exp1", Exp {
-                    column: "customer_type",
-                    operator: "==",
-                    compare_with: ExpVal::STR("REGULAR"),
-                    compare_as: "COMPARE_AS_TEXT"
-                }),
-                ("Exp2", Exp {
-                    column: "invoice_data",
-                    operator: ">",
-                    compare_with: ExpVal::STR("2023-12-31 23:59:59"),
-                    compare_as: "COMPARE_AS_TEXT"
-                }),
-                ("Exp3", Exp {
-                    column: "invoice_amount",
-                    operator: "<",
-                    compare_with: ExpVal::STR("1000"),
-                    compare_as: "COMPARE_AS_NUMBERS"
-                }),
-                ("Exp4", Exp {
-                    column: "address",
-                    operator: "FUZZ_MIN_SCORE_60",
-                    compare_with: ExpVal::VEC(vec!["public school"]),
-                    compare_as: "COMPARE_AS_TEXT"
-                })
-            ],
-            "Exp1 && (Exp2 || Exp3) && Exp4",
-        )
-        .print_row_count()
-        .save_as("/path/to/modified/file.csv");
-
-3. Chainable Options
---------------------
-
-    use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
-
-    CsvBuilder::from_csv("/path/to/your/file1.csv")
-    // A. Setting and adding headers
-    .set_header(vec!["Header1", "Header2", "Header3"])
-    .add_column_header("NewColumn1")
-    .add_column_headers(vec!["NewColumn2", "NewColumn3"])
-    
-    // B. Ordering columns
-    .order_columns(vec!["Column1", "...", "Column5", "Column2"])
-    .order_columns(vec!["...", "Column5", "Column2"])
-    .order_columns(vec!["Column1", "Column5", "..."])
-    
-    // C. Modifying columns
-    .drop_columns(vec!["Column1", "Column3"])
-    .rename_columns(vec![("Column1", "NewColumn1"), ("Column3", "NewColumn3")])
-    
-    // D. Adding and modifying rows
-    .add_row(vec!["Row1-1", "Row1-2", "Row1-3"])
-    .add_rows(vec![vec!["Row1-1", "Row1-2", "Row1-3"], vec!["Row2-1", "Row2-2", "Row2-3"]])
-    .remove_duplicates()
-    
-    // E. Cleaning/ Replacing Cell values
-    .trim_all() // Trims white spaces at the beginning and end of all cells in all columns.
-    .replace_all(vec!["Column1", "Column2"], vec![("null", ""), ("NA", "-")]) // In specified columns
-    .replace_all(vec!["*"], vec![("null", ""), ("NA", "-")]) // In all columns
-    
-    // F. Limiting and sorting
-    .limit(10)
-    .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
-    
-    // G. Applying conditional operations
-    .where_(
-        vec![
-            ("Exp1", Exp {
-                column: "customer_type",
-                operator: "==",
-                compare_with: ExpVal::STR("REGULAR"),
-                compare_as: "COMPARE_AS_TEXT"
-            }),
-            ("Exp2", Exp {
-                column: "invoice_data",
-                operator: ">",
-                compare_with: ExpVal::STR("2023-12-31 23:59:59"),
-                compare_as: "COMPARE_AS_TEXT"
-            }),
-            ("Exp3", Exp {
-                column: "invoice_amount",
-                operator: "<",
-                compare_with: ExpVal::STR("1000"),
-                compare_as: "COMPARE_AS_NUMBERS"
-            }),
-            ("Exp4", Exp {
-                column: "address",
-                operator: "FUZZ_MIN_SCORE_60",
-                compare_with: ExpVal::VEC(vec!["public school"]),
-                compare_as: "COMPARE_AS_TEXT"
-            }),
-            ("Exp5", Exp {
-                column: "status",
-                operator: "CONTAINS",
-                compare_with: ExpVal::STR("REJECTED"),
-                compare_as: "COMPARE_AS_TEXT"
-            }),
-            ("Exp6", Exp {
-                column: "status",
-                operator: "DOES_NOT_CONTAIN",
-                compare_with: ExpVal::STR("HAS NOT PAID"),
-                compare_as: "COMPARE_AS_TEXT"
-            }),
-            ("Exp7", Exp {
-                column: "status",
-                operator: "STARTS_WITH",
-                compare_with: ExpVal::STR("VERIFIED"),
-                compare_as: "COMPARE_AS_TEXT"
-            }),
-        ],
-        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
-    .where_set(
-        vec![
-            // Same as .where() 
-        ],
-        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7",
-        "Column10",
-        "IS OKAY")
-
-    // H. Analytical Prints for data inspection
-    .print_columns()
-    .print_row_count()
-    .print_first_row()
-    .print_last_row()
-    .print_rows_range(2,5)
-    .print_rows()
-    .print_cells(vec!["Column1", "Column2"])
-    .print_unique("column_name")
-    .print_freq(vec!["Column1", "Column2"])
-    .print_freq_mapped(vec![
-            ("Column1", vec![
-                ("Delhi", vec!["New Delhi", "Delhi"]),
-                ("UP", vec!["Ghaziabad", "Noida"])
-            ]),
-            ("Column2", vec![("NO_GROUPINGS", vec![])])
-        ])
-    .print_count_where(
-        vec![
-            // Same as .where()
-        ],
-        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
-
-    // I. Grouping Data
-    .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
-
-    // J. Basic Set Theory Operations (for the Universe U = {1,2,3,4,5,6,7}, A = {1,2,3} and B = {3,4,5})
-    .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL") // {1,2,3,3,4,5} 
-    .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL_WITHOUT_DUPLICATES") // {1,2,3,4,5}
-    .set_intersection_with("/path/to/set_b/file.csv") // {3}
-    .set_difference_with("/path/to/set_b/file.csv") // {1,2} i.e. in A but not in B
-    .set_symmetric_difference_with("/path/to/set_b/file.csv") // {1,2,4,5} i.e. in either, but not in intersection
-    
-    // .set_complement_with determines the compliment qua the universe i.e. {4,5,6,7}. Pass an exclusion vector to exclude specific columns of the universe from consideration, or use vec!["INCLUDE_ALL"] to include all columns of the universe.
-    .set_complement_with("/path/to/universe_set_u/file.csv", vec!["INCLUDE_ALL"]) 
-    .set_complement_with("/path/to/universe_set_u/file.csv", vec!["Column4", "Column5"]) 
-
-    // K. Advanced Set Theory Operations
-    .set_union_with("/path/to/table_b.csv", "UNION_TYPE:LEFT_JOIN_AT{{Column1}}") // Left join using "Column1" as the join column.
-    .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
-
-    // L. Append Derivative Columns
-    .append_derived_boolean_column(
-        "IS_QUALIFIED_FOR_COUPON",
-        vec![
-            // Same as .where() 
-        ],
-        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
-
-    // M. Save
-    .save_as("/path/to/your/file2.csv")
-
-4. Extract Data
----------------
-
-These methods return a CsvBuilder object, and hence, can not be subsequently chained.
-
-    CsvBuilder::from_csv("/path/to/your/file1.csv")
-
-    .get_unique("column_name"); // Returns a Vec<String>
-    .get("column_name"); // Returns cell content as a String, if the csv has been filtered to single row.
-    .get_freq(vec!["Column1", Column2]) // Returns a HashMap where keys are column names and values are vectors of sorted (value, frequency) pairs.
-    .get_freq_mapped(vec![
-            ("Column1", vec![
-                ("Delhi", vec!["New Delhi", "Delhi"]),
-                ("UP", vec!["Ghaziabad", "Noida"])
-            ]),
-            ("Column2", vec![("NO_GROUPINGS", vec![])])
-        ])
-
-
-"#;
-        // docs.to_string();
-
-        println!("{}", docs.to_string());
-
-        docs.to_string()
-    }
-
     /// Creates a new `CsvBuilder` instance with empty headers and data.
     pub fn new() -> Self {
         CsvBuilder {
@@ -513,6 +233,82 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
 
         builder
     }
+
+    /// Reads data from a specified sheet (by index) of an XLS file at the specified `file_path`, then returns a `CsvBuilder`.
+    pub fn from_xls(file_path: &str, sheet_index: usize) -> Self {
+        let mut builder = CsvBuilder::new();
+
+        match open_workbook::<Xls<_>, _>(file_path) {
+            Ok(mut workbook) => {
+                let sheet_names = workbook.sheet_names();
+                if sheet_index == 0 || sheet_index > sheet_names.len() {
+                    // Now using IoError instead of Error
+                    let error = IoError::new(ErrorKind::InvalidInput, "Sheet index out of range");
+                    builder.error = Some(Box::new(error) as Box<dyn Error>);
+                } else {
+                    let sheet_name = &sheet_names[sheet_index - 1];
+                    match workbook.worksheet_range(sheet_name) {
+                        Ok(range) => {
+                            for row in range.rows() {
+                                let row_data: Vec<String> =
+                                    row.iter().map(|cell| cell.to_string()).collect();
+                                if builder.headers.is_empty() {
+                                    builder.headers = row_data;
+                                } else {
+                                    builder.data.push(row_data);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let error = Box::new(e) as Box<dyn Error>;
+                            builder.error = Some(error);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                let error = Box::new(e) as Box<dyn Error>;
+                builder.error = Some(error);
+            }
+        }
+
+        builder
+    }
+
+   /// Calibrates a poorly formatted Csv File
+   pub fn calibrate(&mut self, config: CalibConfig) -> &mut Self {
+        // Parse header_is_at_row to usize, default to 0 if parsing fails
+        let header_index = config.header_is_at_row.parse::<usize>().unwrap_or(0).saturating_sub(2);
+
+        // Set the header and remove the header row from the data
+        if header_index < self.data.len() {
+            if let Some(header_row) = self.data.get(header_index).cloned() {
+                self.headers = header_row;
+                self.data.remove(header_index);
+            }
+        }
+
+        // Parse start index of rows_range_from to usize, default to 0 if parsing fails
+        let start_index = config.rows_range_from.0.parse::<usize>().unwrap_or(0).saturating_sub(3);
+
+        // Determine the end_index based on the second value of rows_range_from
+        let end_index = match config.rows_range_from.1 {
+            "*" => self.data.len(), // "*" represents 'until the end'
+            end_str => end_str.parse::<usize>().unwrap_or(self.data.len()).saturating_sub(2),
+        };
+
+        // Debug information
+        //dbg!(&start_index, &end_index, self.data.get(start_index), self.data.get(end_index.saturating_sub(1)));
+
+        // Filter the data based on the calculated range
+        if start_index < self.data.len() {
+            let end_index = std::cmp::min(end_index, self.data.len());
+            self.data = self.data[start_index..end_index].to_vec();
+        }
+
+        self
+    }
+
 
     /// Saves data in the `CsvBuilder` to a new CSV file at `new_file_path`.
     pub fn save_as(&mut self, new_file_path: &str) -> Result<&mut Self, Box<dyn Error>> {
@@ -775,11 +571,16 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
 
     /// Prints rows within a specified range from the CSV data.
     pub fn print_rows_range(&mut self, start: usize, end: usize) -> &mut Self {
-        let rows = self.data.get(start..end).unwrap_or(&[]);
+        // Adjust the start index to align with internal zero-based indexing
+        let adjusted_start = start.saturating_sub(1);
+        // No need to adjust the end index as the range is exclusive
+
+        let rows = self.data.get(adjusted_start..end).unwrap_or(&[]);
         println!();
         for (offset, row) in rows.iter().enumerate() {
-            let index = start + offset; // Adjusting the index
-            println!("Row {}: ", index);
+            // Adjust the index for display as one-based
+            let display_index = adjusted_start + offset + 1;
+            println!("Row {}: ", display_index);
             self.print_row_json(row);
         }
         self
@@ -789,7 +590,9 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
     pub fn print_rows(&mut self) -> &mut Self {
         println!();
         for (index, row) in self.data.iter().enumerate() {
-            println!("Row {}: ", index);
+            // Adjust the index for display as one-based
+            let display_index = index + 1;
+            println!("Row {}: ", display_index);
             self.print_row_json(row);
         }
 
@@ -974,6 +777,43 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
 
         // Update headers
         self.headers = remaining_headers.into_iter().map(|(_, h)| h).collect();
+
+        self
+    }
+
+    pub fn drop_rows(
+        &mut self,
+        start: &str,
+        range_indicator: &str,
+        end: &str,
+        single: &str,
+    ) -> &mut Self {
+        let mut rows_set = HashSet::new();
+
+        // Check if range_indicator is "..."
+        if range_indicator == "..." {
+            if let (Ok(start_index), Ok(end_index)) = (start.parse::<usize>(), end.parse::<usize>())
+            {
+                // Adjust for 1-based indexing and include the range
+                for i in (start_index.saturating_sub(1))..(end_index) {
+                    rows_set.insert(i);
+                }
+            }
+        }
+
+        // Parse and include the single row index
+        if let Ok(single_index) = single.parse::<usize>() {
+            rows_set.insert(single_index.saturating_sub(1));
+        }
+
+        // Filter out the rows to be dropped
+        self.data = self
+            .data
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !rows_set.contains(i))
+            .map(|(_, row)| row.clone())
+            .collect();
 
         self
     }
@@ -1888,107 +1728,7 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         evaluate_simple_expr(&expression, expr_results)
     }
 
-    /*
-    pub fn pivot_as<'a>(&'a mut self, path: &str, piv: Piv) -> &mut Self {
-        let mut pivot_data: HashMap<String, HashMap<String, f64>> = HashMap::new();
-
-        // Find positions of the necessary columns
-        let index_col_pos = match self.headers.iter().position(|x| x == piv.index_at) {
-            Some(pos) => pos,
-            None => {
-                eprintln!("Error: Index column not found");
-                return self;
-            },
-        };
-
-        let value_col_pos = match self.headers.iter().position(|x| x == piv.values_from) {
-            Some(pos) => pos,
-            None => {
-                eprintln!("Error: Value column not found");
-                return self;
-            },
-        };
-
-        let seg_cols_pos: Vec<_> = piv.seggregate_by.iter()
-            .filter_map(|col| self.headers.iter().position(|x| x == col))
-            .collect();
-
-        if seg_cols_pos.len() != piv.seggregate_by.len() {
-            eprintln!("Error: One or more segmentation columns not found");
-            return self;
-        }
-
-        for row in &self.data {
-            if row.len() <= index_col_pos || row.len() <= value_col_pos || seg_cols_pos.iter().any(|&pos| row.len() <= pos) {
-                continue;
-            }
-
-            let index_value = &row[index_col_pos];
-            let value: f64 = row[value_col_pos].parse().unwrap_or(0.0);
-            let seg_values: Vec<&str> = seg_cols_pos.iter().map(|&pos| row[pos].as_str()).collect();
-            let seg_key = if seg_values.is_empty() { String::new() } else { seg_values.join("_") };
-
-            *pivot_data.entry(index_value.to_string()).or_default()
-                       .entry(seg_key).or_default() += value;
-        }
-
-        // Attempt to write pivot data to CSV, print errors if any occur
-        if let Err(e) = (|| -> Result<(), Box<dyn Error>> {
-            let mut writer = csv::Writer::from_path(path)?;
-
-            // Conditionally write headers based on segmentation
-            if seg_cols_pos.is_empty() {
-                writer.write_record(&["Index", "Value"])?;
-            } else {
-                writer.write_record(&["Index", "Segmentation", "Value"])?;
-            }
-
-            for (index, segments) in pivot_data {
-                for (seg, value) in segments {
-                    if seg_cols_pos.is_empty() {
-                        writer.write_record(&[index.clone(), value.to_string()])?;
-                    } else {
-                        writer.write_record(&[index.clone(), seg, value.to_string()])?;
-                    }
-                }
-            }
-
-            writer.flush    let result = match piv.operation {
-            "SUM" => {
-                segments.values().sum::<f64>()
-            },
-            "AVERAGE" => {
-                let sum: f64 = segments.values().sum();
-                let count = segments.len();
-                if count > 0 { sum / count as f64 } else { 0.0 }
-            },
-            "MEDIAN" => {
-                let mut values: Vec<f64> = segments.values().cloned().collect();
-                values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-                if values.is_empty() {
-                    0.0
-                } else if values.len() % 2 == 1 {
-                    values[values.len() / 2]
-                } else {
-                    let mid = values.len() / 2;
-                    (values[mid - 1] + values[mid]) / 2.0
-                }
-            },
-            _ => {
-                eprintln!("Unsupported operation: {}", piv.operation);
-                0.0
-            }
-        };()?;
-            Ok(())
-        })() {
-            eprintln!("Error writing to CSV: {}", e);
-        }
-
-        self
-    }
-    */
-
+    /// Pivots a CSV
     pub fn pivot_as<'a>(&'a mut self, path: &str, piv: Piv) -> &mut Self {
         //let mut pivot_data: HashMap<String, HashMap<String, f64>> = HashMap::new();
         let mut pivot_data: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
@@ -2119,70 +1859,6 @@ pub struct CsvResultCacher {
 }
 
 impl CsvResultCacher {
-    pub fn get_docs() -> String {
-        let docs = r#"
-
-+++++++++++++++++++++++++++++++++++
-+> CsvResultCacher Documentation <+
-+++++++++++++++++++++++++++++++++++
-
-    use rgwml::api_utils::ApiCallBuilder;
-    use rgwml::csv_utils::{CsvBuilder, CsvResultCacher};
-    use serde_json::json;
-    use tokio;
-
-    async fn generate_daily_sales_report() -> Result<(), Box<dyn std::error::Error>> {
-        async fn fetch_sales_data_from_api() -> Result<String, Box<dyn std::error::Error>> {
-            let method = "POST";
-            let url = "http://example.com/api/sales"; // API URL to fetch sales data
-
-            let payload = json!({
-                "date": "2023-12-21"
-            });
-
-            let response = ApiCallBuilder::call(method, url, None, Some(payload))
-                .execute()
-                .await?;
-
-            Ok(response)
-        }
-
-        let sales_data_response = fetch_sales_data_from_api().await?;
-
-        // Convert the JSON response to CSV format using CsvBuilder
-        let csv_builder = CsvBuilder::from_api_call(sales_data_response)
-            .await
-            .unwrap()
-            .save_as("/path/to/daily_sales_report.csv");
-
-        Ok(())
-    }
-
-    #[tokio::main]
-    async fn main() {
-        let cache_path = "/path/to/daily_sales_report.csv";
-        let cache_duration_minutes = 1440; // Cache duration set to 1 day
-
-        let result = CsvResultCacher::fetch_async(
-            || Box::pin(generate_daily_sales_report()),
-            cache_path,
-            cache_duration_minutes,
-        ).await;
-
-        match result {
-            Ok(_) => println!("Sales report is ready."),
-            Err(e) => eprintln!("Failed to generate sales report: {}", e),
-        }
-    }
-
-"#;
-        // docs.to_string();
-
-        println!("{}", docs.to_string());
-
-        docs.to_string()
-    }
-
     /// Constructs a new `CsvResultCacher` with a specified data generator, cache path, and cache duration in minutes.
     pub fn new<F>(data_generator: F, cache_path: String, cache_duration_minutes: u64) -> Self
     where

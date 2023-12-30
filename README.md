@@ -52,21 +52,6 @@ The `csv_utils` module encompasses a set of utilities designed to simplify vario
 
 - CsvResultCacher: Uses a data generator function to create or fetch data, saves it to a specified path, and keeps it for a set duration. This helps avoid unnecessary data regeneration. Imagine you have a CSV file that logs daily temperatures. You don't want to generate this file every time you access it, especially if the data doesn't change much during the day. Here's how you can use CsvResultCacher:
 
-Easily print example synatax relating to this feature in your workflow.
-
-    use rgwml::csv_utils::{CsvBuilder, CsvConverter, CsvResultCacher};
-    use std::collections::HashMap;
-
-    #[tokio::main]
-    async fn main() {
-
-        let _ = CsvBuilder::get_docs();
-        let _ = CsvConverter::get_docs();
-        let _ = CsvResultCacher::get_docs();
-        std::process::exit(1);
-
-    }
-
 ### CsvConverter
 
     use serde_json::json;
@@ -125,6 +110,12 @@ Example 2: Load from an existing file
 
     let builder = CsvBuilder::from_csv("/path/to/existing/file.csv");
 
+Example 3: Load from an xls file
+
+    use rgwml::csv_utils::CsvBuilder;
+        
+    let builder = CsvBuilder::from_xls("/path/to/existing/file.xls", 1); // Loads from the first sheet of the .xls file
+
 ####  Manipulating a CsvBuilder Object for Analysis or Saving
 
 
@@ -169,38 +160,45 @@ Example 2: Load from an existing file
 
 #### Chainable Options
 
-    use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
+    use rgwml::csv_utils::{CsvBuilder, Exp, ExpVal, Piv, CalibConfig};
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
-    // A. Setting and adding headers
+    // A. Calibrating an irrugularly formatted file
+    .calibrate(
+        CalibConfig {
+            header_is_at_row: "21",
+            rows_range_from: ("23", "*")
+        }) // sets the row 21 content as the header, and row 23 to last row content as the data
+
+    // B. Setting and adding headers
     .set_header(vec!["Header1", "Header2", "Header3"])
     .add_column_header("NewColumn1")
     .add_column_headers(vec!["NewColumn2", "NewColumn3"])
     
-    // B. Ordering columns
+    // C. Ordering columns
     .order_columns(vec!["Column1", "...", "Column5", "Column2"])
     .order_columns(vec!["...", "Column5", "Column2"])
     .order_columns(vec!["Column1", "Column5", "..."])
     
-    // C. Modifying columns
+    // D. Modifying columns
     .drop_columns(vec!["Column1", "Column3"])
     .rename_columns(vec![("Column1", "NewColumn1"), ("Column3", "NewColumn3")])
     
-    // D. Adding and modifying rows
+    // E. Adding and modifying rows
     .add_row(vec!["Row1-1", "Row1-2", "Row1-3"])
     .add_rows(vec![vec!["Row1-1", "Row1-2", "Row1-3"], vec!["Row2-1", "Row2-2", "Row2-3"]])
     .remove_duplicates()
     
-    // E. Cleaning/ Replacing Cell values
+    // F. Cleaning/ Replacing Cell values
     .trim_all() // Trims white spaces at the beginning and end of all cells in all columns.
     .replace_all(vec!["Column1", "Column2"], vec![("null", ""), ("NA", "-")]) // In specified columns
     .replace_all(vec!["*"], vec![("null", ""), ("NA", "-")]) // In all columns
     
-    // F. Limiting and sorting
+    // G. Limiting and sorting
     .limit(10)
     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
     
-    // G. Applying conditional operations
+    // H. Applying conditional operations
     .where_(
         vec![
             ("Exp1", Exp {
@@ -255,13 +253,13 @@ Example 2: Load from an existing file
         "Column10",
         "IS OKAY")
 
-    // H. Analytical Prints for data inspection
+    // I. Analytical Prints for data inspection
     .print_columns()
     .print_row_count()
     .print_first_row()
     .print_last_row()
-    .print_rows_range(2,5)
-    .print_rows()
+    .print_rows_range(2,5) // Shows results per a spreadsheet row range
+    .print_rows() // Shows results as per a spreadsheet row range
     .print_cells(vec!["Column1", "Column2"])
     .print_unique("column_name")
     .print_freq(vec!["Column1", "Column2"])
@@ -278,10 +276,10 @@ Example 2: Load from an existing file
         ],
         "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
 
-    // I. Grouping Data
+    // J. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
 
-    // J. Basic Set Theory Operations (for the Universe U = {1,2,3,4,5,6,7}, A = {1,2,3} and B = {3,4,5})
+    // K. Basic Set Theory Operations (for the Universe U = {1,2,3,4,5,6,7}, A = {1,2,3} and B = {3,4,5})
     .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL") // {1,2,3,3,4,5} 
     .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL_WITHOUT_DUPLICATES") // {1,2,3,4,5}
     .set_intersection_with("/path/to/set_b/file.csv") // {3}
@@ -292,23 +290,35 @@ Example 2: Load from an existing file
     .set_complement_with("/path/to/universe_set_u/file.csv", vec!["INCLUDE_ALL"]) 
     .set_complement_with("/path/to/universe_set_u/file.csv", vec!["Column4", "Column5"]) 
 
-    // K. Advanced Set Theory Operations
+    // L. Advanced Set Theory Operations
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:LEFT_JOIN_AT{{Column1}}") // Left join using "Column1" as the join column.
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
 
-    // L. Append Derivative Columns
+    // M. Append Derivative Columns
     .append_derived_boolean_column(
-        "IS_QUALIFIED_FOR_COUPON",
+        "is_qualified_for_discount",
         vec![
             // Same as .where() 
         ],
         "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
 
-    // M. Save
+    // N. Pivot Tables
+    .pivot_as(
+        "/path/to/save/the/pivot/file/as/csv",
+        Piv {
+            index_at: "category",
+            values_from: "sales",
+            operation: "MEDIAN",
+            seggregate_by: vec![
+                "is_customer",
+                "is_prospect"
+            ],
+        })
+
+    // O. Save
     .save_as("/path/to/your/file2.csv")
 
 #### Extract Data
-
 
 These methods return a CsvBuilder object, and hence, can not be subsequently chained.
 
@@ -410,20 +420,6 @@ Example
 
 4. api_utils
 ------------
-
-Easily print example synatax relating to this feature in your workflow.
-
-    use serde_json::json;
-    use rgwml::api_utils::ApiCallBuilder;
-    use std::collections::HashMap;
-
-    #[tokio::main]
-    async fn main() {
-
-        let _ = ApiCallBuilder::get_docs();
-        std::process::exit(1);
-
-    }
 
 Examples across common API call patterns
 
