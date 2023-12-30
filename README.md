@@ -50,7 +50,7 @@ The `csv_utils` module encompasses a set of utilities designed to simplify vario
 
 - CsvConverter: Provides a method for converting JSON data into CSV format. This utility is particularly useful for processing and saving JSON API responses as CSV files, offering a straightforward approach to data conversion. The `CsvConverter` simplifies the process of converting JSON data into a CSV format. This is particularly useful for scenarios where data is received in JSON format from an API and needs to be transformed into a more accessible and readable CSV file. To use `CsvConverter`, simply call the `from_json` method with the JSON data and the desired output file path as arguments.
 
-- CsvResultCacher: Uses a data generator function to create or fetch data, saves it to a specified path, and keeps it for a set duration. This helps avoid unnecessary data regeneration. Imagine you have a CSV file that logs daily temperatures. You don't want to generate this file every time you access it, especially if the data doesn't change much during the day. Here's how you can use CsvResultCacher:
+- CsvResultCacher: Uses a data generator function to create or fetch data, saves it to a specified path, and keeps it for a set duration. This helps avoid unnecessary data regeneration. Imagine you have a CSV file that logs daily temperatures. You don't want to generate this file every time you access it, especially if the data doesn't change much during the day.
 
 ### CsvConverter
 
@@ -118,7 +118,6 @@ Example 3: Load from an xls file
 
 ####  Manipulating a CsvBuilder Object for Analysis or Saving
 
-
     use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
 
     let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
@@ -156,7 +155,6 @@ Example 3: Load from an xls file
         )
         .print_row_count()
         .save_as("/path/to/modified/file.csv");
-
 
 #### Chainable Options
 
@@ -367,7 +365,7 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
         let csv_builder = CsvBuilder::from_api_call(sales_data_response)
             .await
             .unwrap()
-            .save_as("/path/to/daily_sales_report.csv");
+            .save_as("/path/to/daily/sales/report/cache.csv");
 
         Ok(())
     }
@@ -379,7 +377,7 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
 
         let result = CsvResultCacher::fetch_async(
             || Box::pin(generate_daily_sales_report()),
-            cache_path,
+            "/path/to/daily/sales/report/cache.csv",
             cache_duration_minutes,
         ).await;
 
