@@ -1,6 +1,6 @@
 // csv_utils.rs
 use calamine::{open_workbook, Reader, Xls};
-use chrono::{DateTime, NaiveDateTime};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime};
 use csv::Writer;
 use futures::executor::block_on;
 use futures::future::join_all;
@@ -8,6 +8,7 @@ use futures::Future;
 use fuzzywuzzy::fuzz;
 use regex::Regex;
 use serde_json::Value;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
@@ -87,6 +88,7 @@ impl CompareValue for &str {
                 _ => false,
             },
 
+            /*
             "COMPARE_AS_NUMBERS" => match (cell_value.parse::<f64>(), self.parse::<f64>()) {
                 (Ok(n1), Ok(n2)) => match operation {
                     "==" => n1 == n2,
@@ -99,6 +101,37 @@ impl CompareValue for &str {
                     false
                 }
             },
+            */
+            "COMPARE_AS_NUMBERS" => {
+                // Check if cell_value is empty and provide a default value if needed
+                let cell_value = if cell_value.trim().is_empty() {
+                    "0"
+                } else {
+                    &cell_value
+                };
+
+                // Attempt to parse both cell_value and self as f64
+                match (cell_value.parse::<f64>(), self.parse::<f64>()) {
+                    // If both are successfully parsed, proceed with comparison
+                    (Ok(n1), Ok(n2)) => match operation {
+                        "==" => n1 == n2,
+                        ">" => n1 > n2,
+                        "<" => n1 < n2,
+                        ">=" => n1 >= n2,
+                        "<=" => n1 <= n2,
+                        "!=" => n1 != n2,
+                        _ => {
+                            println!("Unexpected operation: '{}'", operation);
+                            false
+                        }
+                    },
+                    // If parsing fails for either, print an error message
+                    _ => {
+                        println!("Failed to parse as numbers: '{}' or '{}'", cell_value, self);
+                        false
+                    }
+                }
+            }
 
             "COMPARE_AS_TIMESTAMPS" => {
                 let parsed_row_value = CsvBuilder::parse_timestamp(cell_value);
@@ -174,6 +207,7 @@ pub struct Piv {
     pub values_from: &'static str,
     pub operation: &'static str,
     pub seggregate_by: Vec<&'static str>,
+    pub seggregation_direction: &'static str,
 }
 
 pub struct CalibConfig {
@@ -275,10 +309,14 @@ impl CsvBuilder {
         builder
     }
 
-   /// Calibrates a poorly formatted Csv File
-   pub fn calibrate(&mut self, config: CalibConfig) -> &mut Self {
+    /// Calibrates a poorly formatted Csv File
+    pub fn calibrate(&mut self, config: CalibConfig) -> &mut Self {
         // Parse header_is_at_row to usize, default to 0 if parsing fails
-        let header_index = config.header_is_at_row.parse::<usize>().unwrap_or(0).saturating_sub(2);
+        let header_index = config
+            .header_is_at_row
+            .parse::<usize>()
+            .unwrap_or(0)
+            .saturating_sub(2);
 
         // Set the header and remove the header row from the data
         if header_index < self.data.len() {
@@ -289,12 +327,20 @@ impl CsvBuilder {
         }
 
         // Parse start index of rows_range_from to usize, default to 0 if parsing fails
-        let start_index = config.rows_range_from.0.parse::<usize>().unwrap_or(0).saturating_sub(3);
+        let start_index = config
+            .rows_range_from
+            .0
+            .parse::<usize>()
+            .unwrap_or(0)
+            .saturating_sub(3);
 
         // Determine the end_index based on the second value of rows_range_from
         let end_index = match config.rows_range_from.1 {
             "*" => self.data.len(), // "*" represents 'until the end'
-            end_str => end_str.parse::<usize>().unwrap_or(self.data.len()).saturating_sub(2),
+            end_str => end_str
+                .parse::<usize>()
+                .unwrap_or(self.data.len())
+                .saturating_sub(2),
         };
 
         // Debug information
@@ -308,7 +354,6 @@ impl CsvBuilder {
 
         self
     }
-
 
     /// Saves data in the `CsvBuilder` to a new CSV file at `new_file_path`.
     pub fn save_as(&mut self, new_file_path: &str) -> Result<&mut Self, Box<dyn Error>> {
@@ -1667,7 +1712,8 @@ impl CsvBuilder {
             // Evaluate the final result expression and append to the row
             let final_result = self.evaluate_result_expression(&expr_results, result_expression);
             let mut row_clone = row.clone();
-            row_clone.push(final_result.to_string());
+            let result_str = if final_result { "1" } else { "0" };
+            row_clone.push(result_str.to_string());
             updated_data.push(row_clone);
         }
 
@@ -1677,6 +1723,72 @@ impl CsvBuilder {
         self
     }
 
+    /// Splits a data column into helper columns
+    pub fn split_and_append_date_category_columns(
+        &mut self,
+        column_name: &str,
+        date_format: &str,
+    ) -> &mut Self {
+        // Ensure the column exists
+        let column_index = match self.headers.iter().position(|h| h == column_name) {
+            Some(index) => index,
+            None => panic!("Column not found"),
+        };
+
+        // Define new column names
+        let year_month_col = format!("{}_YEAR_MONTH", column_name);
+        let year_month_week_col = format!("{}_YEAR_MONTH_WEEK", column_name);
+
+        // Add new column headers
+        self.headers.push(year_month_col.clone());
+        self.headers.push(year_month_week_col.clone());
+
+        // Prepare updated data
+        let mut updated_data = Vec::new();
+
+        // Iterate over each row
+        for row in &self.data {
+            let mut row_clone = row.clone();
+
+            if let Some(date_str) = row.get(column_index) {
+                // Parse the date using the specified format
+                if let Ok(date) = NaiveDate::parse_from_str(date_str, date_format) {
+                    // Extract year, month, and week
+                    let year = date.year();
+                    let month = date.month();
+                    let week = date.iso_week().week(); // Get ISO week number
+
+                    //println!("Parsed date - Year: {}, Month: {}, Week: {}", year, month, week);
+                    // Adjust format for year-month and year-month-week
+                    let year_month_value = format!("Y{}-M{:02}", year, month);
+                    let year_month_week_value = format!("Y{}-M{:02}-W{:02}", year, month, week);
+
+                    // Add new values to the row
+                    row_clone.push(year_month_value);
+                    row_clone.push(year_month_week_value);
+                } else {
+                    println!("Failed to parse date: '{}'", date_str);
+                    // Handle parse error: add empty strings or a default value
+                    row_clone.push(String::new());
+                    row_clone.push(String::new());
+                }
+            } else {
+                // If the date column is missing, add empty strings
+                row_clone.push(String::new());
+                row_clone.push(String::new());
+            }
+
+            // Add the updated row to the new data
+            updated_data.push(row_clone);
+        }
+
+        // Update the data
+        self.data = updated_data;
+
+        self
+    }
+
+    /// Evaluates truth statements
     fn evaluate_result_expression(
         &self,
         expr_results: &HashMap<&str, bool>,
@@ -1750,93 +1862,186 @@ impl CsvBuilder {
             }
         };
 
+        //dbg!(&piv.seggregate_by);
+
         let seg_cols_pos: Vec<_> = piv
             .seggregate_by
             .iter()
-            .filter_map(|col| self.headers.iter().position(|x| x == col))
+            .filter_map(|col| {
+                let pos = self.headers.iter().position(|x| x.trim() == col.trim());
+                //println!("Looking for column '{}', found at position {:?}", col, pos);
+                pos
+            })
             .collect();
+
+        /*
+        println!(
+            "seg_cols_pos contains positions for these columns: {:?}",
+            seg_cols_pos
+        );
+        */
 
         if seg_cols_pos.len() != piv.seggregate_by.len() {
             eprintln!("Error: One or more segmentation columns not found");
             return self;
         }
 
-        for row in &self.data {
-            if row.len() <= index_col_pos
-                || row.len() <= value_col_pos
-                || seg_cols_pos.iter().any(|&pos| row.len() <= pos)
-            {
-                continue;
-            }
+        // Initialize pivot_data with zeros for all indices and segments
+        for index in self.data.iter().map(|row| &row[index_col_pos]) {
+            let index_value = index.trim().to_string();
+            let segments_entry = pivot_data.entry(index_value).or_insert_with(HashMap::new);
 
-            // Define index_value within the loop
+            for seg in &piv.seggregate_by {
+                segments_entry
+                    .entry(seg.trim().to_string())
+                    .or_insert_with(Vec::new);
+            }
+        }
+
+        for row in &self.data {
+            let row: Vec<String> = row.iter().map(|cell| cell.trim().to_string()).collect();
             let index_value = &row[index_col_pos];
             let value: f64 = row[value_col_pos].parse().unwrap_or(0.0);
 
-            let seg_values: Vec<&str> = seg_cols_pos.iter().map(|&pos| row[pos].as_str()).collect();
-            let seg_key = if seg_values.is_empty() {
-                String::new()
-            } else {
-                seg_values.join("_")
-            };
+            let seg_key = seg_cols_pos.iter().find_map(|&pos| {
+                if row[pos] == "1" {
+                    Some(self.headers[pos].trim().to_string())
+                } else {
+                    None
+                }
+            });
 
-            pivot_data
-                .entry(index_value.to_string())
-                .or_insert_with(HashMap::new)
-                .entry(seg_key)
-                .or_default()
-                .push(value); // Push individual values instead of summing
+            if let Some(seg_key) = seg_key {
+                pivot_data
+                    .get_mut(index_value)
+                    .unwrap()
+                    .get_mut(&seg_key)
+                    .unwrap()
+                    .push(value);
+            } else {
+                println!("Error: No segmentation key found for row: {:?}", row);
+                // If you want to include rows without a segmentation key in the output with a default key, uncomment the next line:
+                // let seg_key = "No Segment".to_string();
+            }
         }
+
+        let mut sorted_keys: Vec<_> = pivot_data.keys().collect();
+        sorted_keys.sort();
 
         // Perform operations and write to CSV
         if let Err(e) = (|| -> Result<(), Box<dyn Error>> {
-            let mut writer = Writer::from_path(path)?;
+            let mut writer = csv::Writer::from_path(path)?;
 
-            // Write headers
-            if seg_cols_pos.is_empty() {
-                writer.write_record(&["Index", "Value"])?;
-            } else {
-                writer.write_record(&["Index", "Segmentation", "Value"])?;
-            }
+            match piv.seggregation_direction {
+                "HORIZONTAL" => {
+                    // Write the headers for horizontal format
+                    let mut headers = vec!["Index"];
+                    headers.extend_from_slice(&piv.seggregate_by);
+                    headers.push("Value");
+                    writer.write_record(&headers)?;
 
-            for (index, segments) in pivot_data {
-                println!("Operation: {}", piv.operation); // Debugging output
-                dbg!(&segments);
+                    // Write data in horizontal format
+                    for index in sorted_keys {
+                        let mut row = vec![index.clone()];
+                        let segments = pivot_data.get(index).unwrap();
+                        let mut total: f64 = 0.0;
 
-                let result = match piv.operation {
-                    "SUM" => segments.values().flatten().sum::<f64>(),
-                    "MEAN" => {
-                        let sum: f64 = segments.values().flatten().sum();
-                        let count = segments.values().map(|v| v.len()).sum::<usize>();
-                        if count > 0 {
-                            sum / count as f64
-                        } else {
-                            0.0
+                        for seg in &piv.seggregate_by {
+                            // Work with Option<&[f64]> to avoid temporary value issues
+                            let segment_values_option = segments.get(*seg).map(|v| v.as_slice());
+
+                            let segment_values = match segment_values_option {
+                                Some(values) => values,
+                                None => &[], // Use a reference to an empty slice directly
+                            };
+
+                            let segment_total: f64 = match piv.operation {
+                                "COUNT" => segment_values.len() as f64,
+                                "SUM" => segment_values.iter().sum(),
+                                "MEAN" => {
+                                    let sum: f64 = segment_values.iter().sum();
+                                    let count = segment_values.len();
+                                    if count > 0 {
+                                        sum / count as f64
+                                    } else {
+                                        0.0
+                                    }
+                                }
+                                "MEDIAN" => {
+                                    let mut vals = segment_values.to_vec();
+                                    vals.sort_unstable_by(|a, b| {
+                                        a.partial_cmp(b).unwrap_or(Ordering::Equal)
+                                    });
+                                    if vals.len() % 2 == 1 {
+                                        vals[vals.len() / 2]
+                                    } else if !vals.is_empty() {
+                                        let mid = vals.len() / 2;
+                                        (vals[mid - 1] + vals[mid]) / 2.0
+                                    } else {
+                                        0.0
+                                    }
+                                }
+
+                                _ => 0.0, // default case or handle error
+                            };
+
+                            total += segment_total;
+                            row.push(format!("{:.2}", segment_total));
+                            //row.push(segment_total.to_string());
+                        }
+                        // Add the total value to the end of the row
+                        //row.push(total.to_string());
+                        row.push(format!("{:.2}", total));
+                        writer.write_record(&row)?;
+                    }
+                }
+                "VERTICAL" | _ => {
+                    // Default to vertical if unknown format
+                    // Write headers for vertical format
+                    writer.write_record(&["Index", "Segmentation", "Value"])?;
+
+                    // Write data in vertical format
+                    for index in sorted_keys {
+                        if let Some(segments) = pivot_data.get(index) {
+                            for (seg_key, values) in segments {
+                                let result = match piv.operation {
+                                    "SUM" => {
+                                        let sum: f64 = values.iter().sum();
+                                        format!("{:.2}", sum)
+                                    }
+                                    "COUNT" => {
+                                        let count = values.len() as f64;
+                                        format!("{:.2}", count)
+                                    }
+                                    "MEAN" => {
+                                        let sum: f64 = values.iter().sum();
+                                        let count = values.len();
+                                        let mean = if count > 0 { sum / count as f64 } else { 0.0 };
+                                        format!("{:.2}", mean)
+                                    }
+                                    "MEDIAN" => {
+                                        let mut sorted_values = values.clone();
+                                        sorted_values.sort_unstable_by(|a, b| {
+                                            a.partial_cmp(b).unwrap_or(Ordering::Equal)
+                                        });
+
+                                        let median = if sorted_values.len() % 2 == 1 {
+                                            sorted_values[sorted_values.len() / 2]
+                                        } else if !sorted_values.is_empty() {
+                                            let mid = sorted_values.len() / 2;
+                                            (sorted_values[mid - 1] + sorted_values[mid]) / 2.0
+                                        } else {
+                                            0.0
+                                        };
+                                        format!("{:.2}", median)
+                                    }
+                                    // Other cases...
+                                    _ => format!("{:.2}", 0.0), // default case or handle error
+                                };
+                                writer.write_record(&[index, seg_key, &result.to_string()])?;
+                            }
                         }
                     }
-                    "MEDIAN" => {
-                        let mut values: Vec<f64> = segments.values().flatten().cloned().collect();
-                        values.sort_unstable_by(|a, b| {
-                            a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-                        });
-                        if values.len() % 2 == 1 {
-                            values[values.len() / 2]
-                        } else {
-                            let mid = values.len() / 2;
-                            (values[mid - 1] + values[mid]) / 2.0
-                        }
-                    }
-                    _ => {
-                        eprintln!("Unsupported operation: {}", piv.operation);
-                        0.0
-                    }
-                };
-
-                dbg!(&result);
-                if seg_cols_pos.is_empty() {
-                    writer.write_record(&[index, result.to_string()])?;
-                } else {
-                    writer.write_record(&[index, "".to_string(), result.to_string()])?;
                 }
             }
 

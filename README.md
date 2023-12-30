@@ -301,18 +301,21 @@ Example 3: Load from an xls file
             // Same as .where() 
         ],
         "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
+    .split_and_append_date_category_columns("Column10", "%d/%m/%y") // Appends additional columns splitting a date/timestamp into categorization columns by year, month and week
+
 
     // N. Pivot Tables
     .pivot_as(
         "/path/to/save/the/pivot/file/as/csv",
         Piv {
-            index_at: "category",
+            index_at: "month",
             values_from: "sales",
             operation: "MEDIAN",
             seggregate_by: vec![
                 "is_customer",
                 "is_prospect"
             ],
+            seggregation_direction: "HORIZONTAL" // Can also be "VERTICAL"
         })
 
     // O. Save
