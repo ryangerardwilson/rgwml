@@ -1,6 +1,6 @@
 // csv_utils.rs
 use calamine::{open_workbook, Reader, Xls};
-use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, Timelike};
 use csv::Writer;
 use futures::executor::block_on;
 use futures::future::join_all;
@@ -206,8 +206,9 @@ pub struct Piv {
     pub index_at: &'static str,
     pub values_from: &'static str,
     pub operation: &'static str,
-    pub seggregate_by: Vec<&'static str>,
-    pub seggregation_direction: &'static str,
+    pub seggregate_by: Vec<(&'static str, &'static str)>,
+    //pub seggregate_by: Vec<&'static str>,
+    //pub seggregation_direction: &'static str,
 }
 
 pub struct CalibConfig {
@@ -1723,8 +1724,73 @@ impl CsvBuilder {
         self
     }
 
-    /// Splits a data column into helper columns
-    pub fn split_and_append_date_category_columns(
+    pub fn append_derived_category_column(
+        &mut self,
+        new_column_name: &str,
+        categories: Vec<(&str, Vec<(&str, Exp)>, &str)>,
+    ) -> &mut Self {
+        // Add new column header
+        self.headers.push(new_column_name.to_string());
+
+        // Clone headers to avoid borrowing issues
+        let headers_clone = self.headers.clone();
+
+        // Create a new vector to hold the updated data
+        let mut updated_data = Vec::new();
+
+        // Iterate over each row
+        for row in &self.data {
+            let mut category_assigned = false;
+
+            for (category_name, expressions, result_expression) in &categories {
+                let mut expr_results = HashMap::new();
+
+                // Evaluate each expression in the category
+                for (expr_name, exp) in expressions {
+                    if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                        if let Some(cell_value) = row.get(column_index) {
+                            let result = match &exp.compare_with {
+                                ExpVal::STR(value_str) => {
+                                    value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                }
+                                ExpVal::VEC(values) => {
+                                    values.apply(cell_value, exp.operator, exp.compare_as)
+                                }
+                            };
+                            expr_results.insert(*expr_name, result);
+                        }
+                    }
+                }
+
+                // Evaluate the final result expression for the category
+                let final_result =
+                    self.evaluate_result_expression(&expr_results, result_expression);
+                if final_result {
+                    let mut row_clone = row.clone();
+                    row_clone.push(category_name.to_string());
+                    updated_data.push(row_clone);
+                    category_assigned = true;
+                    break; // Exit the loop once a category is assigned
+                }
+            }
+
+            // If no category is assigned, assign a default value or handle it as required
+            if !category_assigned {
+                let mut row_clone = row.clone();
+                row_clone.push("Uncategorized".to_string()); // or handle as needed
+                updated_data.push(row_clone);
+            }
+        }
+
+        // Replace the original data with the updated data
+        self.data = updated_data;
+
+        self
+    }
+
+    /// Splits a date column into category columns which can be used for pivoting
+
+    pub fn split_date_as_appended_category_columns(
         &mut self,
         column_name: &str,
         date_format: &str,
@@ -1735,13 +1801,17 @@ impl CsvBuilder {
             None => panic!("Column not found"),
         };
 
-        // Define new column names
+        // Define potential new column names
+        let year_col = format!("{}_YEAR", column_name);
         let year_month_col = format!("{}_YEAR_MONTH", column_name);
-        let year_month_week_col = format!("{}_YEAR_MONTH_WEEK", column_name);
+        let year_month_day_col = format!("{}_YEAR_MONTH_DAY", column_name);
+        let year_month_day_hour_col = format!("{}_YEAR_MONTH_DAY_HOUR", column_name);
 
-        // Add new column headers
-        self.headers.push(year_month_col.clone());
-        self.headers.push(year_month_week_col.clone());
+        // Flags to determine which columns to add
+        let mut add_year = false;
+        let mut add_year_month = false;
+        let mut add_year_month_day = false;
+        let mut add_year_month_day_hour = false;
 
         // Prepare updated data
         let mut updated_data = Vec::new();
@@ -1751,35 +1821,76 @@ impl CsvBuilder {
             let mut row_clone = row.clone();
 
             if let Some(date_str) = row.get(column_index) {
-                // Parse the date using the specified format
-                if let Ok(date) = NaiveDate::parse_from_str(date_str, date_format) {
-                    // Extract year, month, and week
-                    let year = date.year();
-                    let month = date.month();
-                    let week = date.iso_week().week(); // Get ISO week number
+                let parsed_datetime = NaiveDateTime::parse_from_str(date_str, date_format);
+                let (year, month, day, hour) = match parsed_datetime {
+                    Ok(datetime) => {
+                        // Set flags
+                        add_year = true;
+                        add_year_month = true;
+                        add_year_month_day = true;
+                        add_year_month_day_hour = true;
 
-                    //println!("Parsed date - Year: {}, Month: {}, Week: {}", year, month, week);
-                    // Adjust format for year-month and year-month-week
-                    let year_month_value = format!("Y{}-M{:02}", year, month);
-                    let year_month_week_value = format!("Y{}-M{:02}-W{:02}", year, month, week);
+                        (
+                            datetime.year(),
+                            datetime.month(),
+                            datetime.day(),
+                            Some(datetime.hour()),
+                        )
+                    }
+                    Err(_) => {
+                        match NaiveDate::parse_from_str(date_str, date_format) {
+                            Ok(date) => {
+                                // Set flags
+                                add_year = true;
+                                add_year_month = true;
+                                add_year_month_day = true;
 
-                    // Add new values to the row
-                    row_clone.push(year_month_value);
-                    row_clone.push(year_month_week_value);
-                } else {
-                    println!("Failed to parse date: '{}'", date_str);
-                    // Handle parse error: add empty strings or a default value
-                    row_clone.push(String::new());
-                    row_clone.push(String::new());
+                                (date.year(), date.month(), date.day(), None)
+                            }
+                            Err(_) => {
+                                println!("Failed to parse date: '{}'", date_str);
+                                continue;
+                            }
+                        }
+                    }
+                };
+
+                // Add new values to the row based on flags
+                if add_year {
+                    row_clone.push(format!("Y{}", year));
                 }
-            } else {
-                // If the date column is missing, add empty strings
-                row_clone.push(String::new());
-                row_clone.push(String::new());
+                if add_year_month {
+                    row_clone.push(format!("Y{}-M{:02}", year, month));
+                }
+                if add_year_month_day {
+                    row_clone.push(format!("Y{}-M{:02}-D{:02}", year, month, day));
+                }
+                if add_year_month_day_hour {
+                    if let Some(hour_val) = hour {
+                        row_clone.push(format!(
+                            "Y{}-M{:02}-D{:02}-H{:02}",
+                            year, month, day, hour_val
+                        ));
+                    }
+                }
             }
 
             // Add the updated row to the new data
             updated_data.push(row_clone);
+        }
+
+        // Add headers based on flags
+        if add_year {
+            self.headers.push(year_col);
+        }
+        if add_year_month {
+            self.headers.push(year_month_col);
+        }
+        if add_year_month_day {
+            self.headers.push(year_month_day_col);
+        }
+        if add_year_month_day_hour {
+            self.headers.push(year_month_day_hour_col);
         }
 
         // Update the data
@@ -1842,11 +1953,10 @@ impl CsvBuilder {
 
     /// Pivots a CSV
     pub fn pivot_as<'a>(&'a mut self, path: &str, piv: Piv) -> &mut Self {
-        //let mut pivot_data: HashMap<String, HashMap<String, f64>> = HashMap::new();
         let mut pivot_data: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
 
-        // Find positions of the necessary columns
-        let index_col_pos = match self.headers.iter().position(|x| x == piv.index_at) {
+        // Finding positions of the necessary columns
+        let index_col_pos = match self.headers.iter().position(|x| *x == piv.index_at) {
             Some(pos) => pos,
             None => {
                 eprintln!("Error: Index column not found");
@@ -1854,7 +1964,7 @@ impl CsvBuilder {
             }
         };
 
-        let value_col_pos = match self.headers.iter().position(|x| x == piv.values_from) {
+        let value_col_pos = match self.headers.iter().position(|x| *x == piv.values_from) {
             Some(pos) => pos,
             None => {
                 eprintln!("Error: Value column not found");
@@ -1862,26 +1972,19 @@ impl CsvBuilder {
             }
         };
 
-        //dbg!(&piv.seggregate_by);
-
-        let seg_cols_pos: Vec<_> = piv
+        // Collecting positions and types for the segmentation columns
+        let seg_cols_info: Vec<_> = piv
             .seggregate_by
             .iter()
-            .filter_map(|col| {
-                let pos = self.headers.iter().position(|x| x.trim() == col.trim());
-                //println!("Looking for column '{}', found at position {:?}", col, pos);
-                pos
+            .filter_map(|&(col, seg_type)| {
+                self.headers
+                    .iter()
+                    .position(|x| x == col)
+                    .map(|pos| (pos, seg_type))
             })
             .collect();
 
-        /*
-        println!(
-            "seg_cols_pos contains positions for these columns: {:?}",
-            seg_cols_pos
-        );
-        */
-
-        if seg_cols_pos.len() != piv.seggregate_by.len() {
+        if seg_cols_info.len() != piv.seggregate_by.len() {
             eprintln!("Error: One or more segmentation columns not found");
             return self;
         }
@@ -1891,10 +1994,26 @@ impl CsvBuilder {
             let index_value = index.trim().to_string();
             let segments_entry = pivot_data.entry(index_value).or_insert_with(HashMap::new);
 
-            for seg in &piv.seggregate_by {
-                segments_entry
-                    .entry(seg.trim().to_string())
-                    .or_insert_with(Vec::new);
+            for &(col, seg_type) in &piv.seggregate_by {
+                match seg_type {
+                    "AS_BOOLEAN" => {
+                        segments_entry
+                            .entry(col.to_string())
+                            .or_insert_with(Vec::new);
+                    }
+                    "AS_CATEGORY" => {
+                        // For each row, insert unique categories into pivot_data
+                        for row in &self.data {
+                            let category = row[self.headers.iter().position(|x| x == col).unwrap()]
+                                .trim()
+                                .to_string();
+                            segments_entry.entry(category).or_insert_with(Vec::new);
+                        }
+                    }
+                    _ => {
+                        eprintln!("Error: Unrecognized segregation type '{}'", seg_type);
+                    }
+                }
             }
         }
 
@@ -1903,25 +2022,36 @@ impl CsvBuilder {
             let index_value = &row[index_col_pos];
             let value: f64 = row[value_col_pos].parse().unwrap_or(0.0);
 
-            let seg_key = seg_cols_pos.iter().find_map(|&pos| {
-                if row[pos] == "1" {
-                    Some(self.headers[pos].trim().to_string())
-                } else {
-                    None
-                }
-            });
+            for &(col, seg_type) in &piv.seggregate_by {
+                let col_pos = self.headers.iter().position(|x| x == col).unwrap();
 
-            if let Some(seg_key) = seg_key {
-                pivot_data
-                    .get_mut(index_value)
-                    .unwrap()
-                    .get_mut(&seg_key)
-                    .unwrap()
-                    .push(value);
-            } else {
-                println!("Error: No segmentation key found for row: {:?}", row);
-                // If you want to include rows without a segmentation key in the output with a default key, uncomment the next line:
-                // let seg_key = "No Segment".to_string();
+                match seg_type {
+                    "AS_BOOLEAN" => {
+                        if row[col_pos] == "1" {
+                            let seg_key = col.to_string();
+                            pivot_data
+                                .get_mut(index_value)
+                                .unwrap()
+                                .get_mut(&seg_key)
+                                .unwrap()
+                                .push(value);
+                        }
+                    }
+                    "AS_CATEGORY" => {
+                        let col_pos = self.headers.iter().position(|x| x == col).unwrap();
+                        let category_value = row[col_pos].clone();
+                        //dbg!(&col, &col_pos, &category_value);
+                        pivot_data
+                            .entry(index_value.clone())
+                            .or_default()
+                            .entry(category_value)
+                            .or_default()
+                            .push(value);
+                    }
+                    _ => {
+                        println!("Error: Unrecognized segregation type for column '{}'", col);
+                    }
+                }
             }
         }
 
@@ -1931,30 +2061,46 @@ impl CsvBuilder {
         // Perform operations and write to CSV
         if let Err(e) = (|| -> Result<(), Box<dyn Error>> {
             let mut writer = csv::Writer::from_path(path)?;
+            // Write the headers for horizontal format
+            let mut headers = vec!["Index"];
 
-            match piv.seggregation_direction {
-                "HORIZONTAL" => {
-                    // Write the headers for horizontal format
-                    let mut headers = vec!["Index"];
-                    headers.extend_from_slice(&piv.seggregate_by);
-                    headers.push("Value");
-                    writer.write_record(&headers)?;
+            // Add AS_BOOLEAN columns to the headers
+            for (col, seg_type) in &piv.seggregate_by {
+                if *seg_type == "AS_BOOLEAN" {
+                    headers.push(col);
+                }
+            }
 
-                    // Write data in horizontal format
-                    for index in sorted_keys {
-                        let mut row = vec![index.clone()];
-                        let segments = pivot_data.get(index).unwrap();
-                        let mut total: f64 = 0.0;
+            // Collect all unique AS_CATEGORY values
+            let mut all_categories = HashSet::new();
+            for segments in pivot_data.values() {
+                for category in segments.keys() {
+                    all_categories.insert(category.clone());
+                }
+            }
 
-                        for seg in &piv.seggregate_by {
-                            // Work with Option<&[f64]> to avoid temporary value issues
-                            let segment_values_option = segments.get(*seg).map(|v| v.as_slice());
+            // Sort the category values if needed and add them to the headers
+            let mut sorted_categories: Vec<_> = all_categories.into_iter().collect();
+            sorted_categories.sort();
 
-                            let segment_values = match segment_values_option {
-                                Some(values) => values,
-                                None => &[], // Use a reference to an empty slice directly
-                            };
+            // Since `headers` is a `Vec<&str>`, we need to map `sorted_categories` to `&str`
+            let category_str_slices: Vec<&str> =
+                sorted_categories.iter().map(|s| s.as_str()).collect();
+            headers.extend(category_str_slices);
 
+            headers.push("Value");
+            writer.write_record(&headers)?;
+
+            // Write data in horizontal format
+            for index in sorted_keys {
+                let mut row = vec![index.clone()];
+                let segments = pivot_data.get(index).unwrap();
+                let mut total: f64 = 0.0;
+
+                // Add values for AS_BOOLEAN columns
+                for (col, seg_type) in &piv.seggregate_by {
+                    if *seg_type == "AS_BOOLEAN" {
+                        if let Some(segment_values) = segments.get(*col) {
                             let segment_total: f64 = match piv.operation {
                                 "COUNT" => segment_values.len() as f64,
                                 "SUM" => segment_values.iter().sum(),
@@ -1970,7 +2116,7 @@ impl CsvBuilder {
                                 "MEDIAN" => {
                                     let mut vals = segment_values.to_vec();
                                     vals.sort_unstable_by(|a, b| {
-                                        a.partial_cmp(b).unwrap_or(Ordering::Equal)
+                                        a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
                                     });
                                     if vals.len() % 2 == 1 {
                                         vals[vals.len() / 2]
@@ -1981,68 +2127,68 @@ impl CsvBuilder {
                                         0.0
                                     }
                                 }
-
-                                _ => 0.0, // default case or handle error
+                                _ => 0.0, // Handle the default case or error
                             };
-
                             total += segment_total;
                             row.push(format!("{:.2}", segment_total));
-                            //row.push(segment_total.to_string());
+                        } else {
+                            row.push("0.00".to_string()); // Default value if the segment doesn't exist
                         }
-                        // Add the total value to the end of the row
-                        //row.push(total.to_string());
-                        row.push(format!("{:.2}", total));
-                        writer.write_record(&row)?;
                     }
                 }
-                "VERTICAL" | _ => {
-                    // Default to vertical if unknown format
-                    // Write headers for vertical format
-                    writer.write_record(&["Index", "Segmentation", "Value"])?;
 
-                    // Write data in vertical format
-                    for index in sorted_keys {
-                        if let Some(segments) = pivot_data.get(index) {
-                            for (seg_key, values) in segments {
-                                let result = match piv.operation {
-                                    "SUM" => {
-                                        let sum: f64 = values.iter().sum();
-                                        format!("{:.2}", sum)
-                                    }
-                                    "COUNT" => {
-                                        let count = values.len() as f64;
-                                        format!("{:.2}", count)
-                                    }
-                                    "MEAN" => {
-                                        let sum: f64 = values.iter().sum();
-                                        let count = values.len();
-                                        let mean = if count > 0 { sum / count as f64 } else { 0.0 };
-                                        format!("{:.2}", mean)
-                                    }
-                                    "MEDIAN" => {
-                                        let mut sorted_values = values.clone();
-                                        sorted_values.sort_unstable_by(|a, b| {
-                                            a.partial_cmp(b).unwrap_or(Ordering::Equal)
-                                        });
-
-                                        let median = if sorted_values.len() % 2 == 1 {
-                                            sorted_values[sorted_values.len() / 2]
-                                        } else if !sorted_values.is_empty() {
-                                            let mid = sorted_values.len() / 2;
-                                            (sorted_values[mid - 1] + sorted_values[mid]) / 2.0
-                                        } else {
-                                            0.0
-                                        };
-                                        format!("{:.2}", median)
-                                    }
-                                    // Other cases...
-                                    _ => format!("{:.2}", 0.0), // default case or handle error
-                                };
-                                writer.write_record(&[index, seg_key, &result.to_string()])?;
+                // Add values for AS_CATEGORY columns
+                for category in &sorted_categories {
+                    if let Some(segment_values) = segments.get(category) {
+                        let segment_total: f64 = match piv.operation {
+                            "COUNT" => segment_values.len() as f64,
+                            "SUM" => segment_values.iter().sum(),
+                            "MEAN" => {
+                                let sum: f64 = segment_values.iter().sum();
+                                let count = segment_values.len();
+                                if count > 0 {
+                                    sum / count as f64
+                                } else {
+                                    0.0
+                                }
                             }
-                        }
+                            "MEDIAN" => {
+                                let mut vals = segment_values.to_vec();
+                                vals.sort_unstable_by(|a, b| {
+                                    a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                                });
+                                if vals.len() % 2 == 1 {
+                                    vals[vals.len() / 2]
+                                } else if !vals.is_empty() {
+                                    let mid = vals.len() / 2;
+                                    (vals[mid - 1] + vals[mid]) / 2.0
+                                } else {
+                                    0.0
+                                }
+                            }
+                            _ => 0.0, // Handle the default case or error
+                        };
+                        total += segment_total;
+                        row.push(format!("{:.2}", segment_total));
+                    } else {
+                        row.push("0.00".to_string()); // Default value if the segment doesn't exist
                     }
                 }
+
+                // Add the total value at the end of the row
+                row.push(format!("{:.2}", total));
+
+                // Ensure the row has the same number of fields as the headers
+                if row.len() != headers.len() {
+                    eprintln!(
+                        "Error: Row length {} does not match headers length {}",
+                        row.len(),
+                        headers.len()
+                    );
+                    continue; // Skip this row or handle the error as needed
+                }
+
+                writer.write_record(&row)?;
             }
 
             writer.flush()?;

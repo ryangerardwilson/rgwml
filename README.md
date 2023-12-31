@@ -299,8 +299,41 @@ Example 3: Load from an xls file
             // Same as .where() 
         ],
         "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
-    .split_and_append_date_category_columns("Column10", "%d/%m/%y") // Appends additional columns splitting a date/timestamp into categorization columns by year, month and week
-
+    .append_derived_category_column(
+        "EXPENSE_RANGE",
+        vec![
+            (
+                "< 1000",
+                vec![
+                    ("Exp1", Exp {
+                        column: "Withdrawal Amt.",
+                        operator: "<",
+                        compare_with: ExpVal::STR("1000"),
+                        compare_as: "COMPARE_AS_NUMBERS"
+                    }),
+                ],
+                "Exp1"
+            ),
+            (
+                "1000-5000",
+                vec![
+                    ("Exp1", Exp {
+                        column: "Withdrawal Amt.",
+                        operator: ">=",
+                        compare_with: ExpVal::STR("1000"),
+                        compare_as: "COMPARE_AS_NUMBERS"
+                    }),
+                    ("Exp2", Exp {
+                        column: "Withdrawal Amt.",
+                        operator: "<",
+                        compare_with: ExpVal::STR("5000"),
+                        compare_as: "COMPARE_AS_NUMBERS"
+                    }),
+                ],
+                "Exp1 && Exp2"
+            )
+        )
+    .split_date_as_appended_category_columns("Column10", "%d/%m/%y") // Appends additional columns splitting a date/timestamp into categorization columns by year, month and week
 
     // N. Pivot Tables
     .pivot_as(
@@ -310,10 +343,9 @@ Example 3: Load from an xls file
             values_from: "sales",
             operation: "MEDIAN",
             seggregate_by: vec![
-                "is_customer",
-                "is_prospect"
+                ("is_customer", "AS_BOOLEAN") // Is appended directly as a seggregation column
+                ("acquisition_type", "AS_CATEGORY") // The unique values of this column are appended as seggregation columns
             ],
-            seggregation_direction: "HORIZONTAL" // Can also be "VERTICAL"
         })
 
     // O. Save
