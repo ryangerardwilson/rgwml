@@ -8,7 +8,6 @@ use futures::Future;
 use fuzzywuzzy::fuzz;
 use regex::Regex;
 use serde_json::Value;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
@@ -2073,11 +2072,17 @@ impl CsvBuilder {
 
             // Collect all unique AS_CATEGORY values
             let mut all_categories = HashSet::new();
-            for segments in pivot_data.values() {
-                for category in segments.keys() {
-                    all_categories.insert(category.clone());
+            for (_col, seg_type) in &piv.seggregate_by {
+                if *seg_type == "AS_CATEGORY" {
+                    for segments in pivot_data.values() {
+                        for category in segments.keys() {
+                            all_categories.insert(category.clone());
+                        }
+                    }
                 }
             }
+
+            dbg!(&all_categories);
 
             // Sort the category values if needed and add them to the headers
             let mut sorted_categories: Vec<_> = all_categories.into_iter().collect();
