@@ -334,6 +334,23 @@ Example 3: Load from an xls file
             )
         )
     .append_derived_concatenation_column("NewColumnName", vec!["Column1", " ", "Column2", "@"]) // Items in the vector that are not column names will be concatenated as strings
+    .append_fuzzai_analysis_columns(
+        "Column1", // Name of column to be analyzed
+        "sales_analysis", // Identifier for newly created columns
+        vec![
+            Train {
+                input: "I want my money back",
+                output: "refund"
+            },
+            Train {
+                input: "I want a refund immediately",
+                output: "refund"
+            },
+        ],
+        "WORD_SPLIT:2", // The minimum length of word combinations that training data is to be broken into
+        "WORD_LENGTH_SENSITIVITY:0.8", // Multiplies differences in word length between training data input and the value being analyzed by 0.8
+        "GET_BEST:2" // Get the top 2 results, max value is 3
+        )
     .split_date_as_appended_category_columns("Column10", "%d/%m/%y") // Appends additional columns splitting a date/timestamp into categorization columns by year, month and week
 
     // N. Pivot Tables
