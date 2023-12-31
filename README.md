@@ -333,6 +333,7 @@ Example 3: Load from an xls file
                 "Exp1 && Exp2"
             )
         )
+    .append_derived_concatenation_column("NewColumnName", vec!["Column1", " ", "Column2", "@"]) // Items in the vector that are not column names will be concatenated as strings
     .split_date_as_appended_category_columns("Column10", "%d/%m/%y") // Appends additional columns splitting a date/timestamp into categorization columns by year, month and week
 
     // N. Pivot Tables

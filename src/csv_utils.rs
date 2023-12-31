@@ -1787,8 +1787,49 @@ impl CsvBuilder {
         self
     }
 
-    /// Splits a date column into category columns which can be used for pivoting
+    /// Appends a column concatenting the values of the indicated column
+    pub fn append_derived_concatenation_column(
+        &mut self,
+        new_column_name: &str,
+        items_to_concatenate: Vec<&str>,
+    ) -> &mut Self {
+        // Add new column header
+        self.headers.push(new_column_name.to_string());
 
+        // Create a new vector to hold the updated data
+        let mut updated_data = Vec::new();
+
+        // Iterate over each row in the data
+        for row in &self.data {
+            // Initialize an empty string to store concatenated result
+            let mut concatenated_result = String::new();
+
+            // Iterate over each item to be concatenated
+            for item in &items_to_concatenate {
+                if let Some(column_index) = self.headers.iter().position(|h| h == item) {
+                    // If the item is a column name, append its value from the row
+                    if let Some(cell_value) = row.get(column_index) {
+                        concatenated_result.push_str(cell_value);
+                    }
+                } else {
+                    // If the item is not a column name, append it as-is
+                    concatenated_result.push_str(item);
+                }
+            }
+
+            // Clone the row and append the concatenated result
+            let mut row_clone = row.clone();
+            row_clone.push(concatenated_result);
+            updated_data.push(row_clone);
+        }
+
+        // Replace the original data with the updated data
+        self.data = updated_data;
+
+        self
+    }
+
+    /// Splits a date column into category columns which can be used for pivoting
     pub fn split_date_as_appended_category_columns(
         &mut self,
         column_name: &str,
@@ -2096,11 +2137,13 @@ impl CsvBuilder {
             headers.push("Value");
             writer.write_record(&headers)?;
 
+            //let mut total_pushed: bool = false;
             // Write data in horizontal format
             for index in sorted_keys {
                 let mut row = vec![index.clone()];
                 let segments = pivot_data.get(index).unwrap();
                 let mut total: f64 = 0.0;
+                let mut total_assessed: bool = false;
 
                 // Add values for AS_BOOLEAN columns
                 for (col, seg_type) in &piv.seggregate_by {
@@ -2136,6 +2179,7 @@ impl CsvBuilder {
                             };
                             total += segment_total;
                             row.push(format!("{:.2}", segment_total));
+                            total_assessed = true;
                         } else {
                             row.push("0.00".to_string()); // Default value if the segment doesn't exist
                         }
@@ -2173,7 +2217,9 @@ impl CsvBuilder {
                             }
                             _ => 0.0, // Handle the default case or error
                         };
-                        total += segment_total;
+                        if total_assessed == false {
+                            total += segment_total;
+                        }
                         row.push(format!("{:.2}", segment_total));
                     } else {
                         row.push("0.00".to_string()); // Default value if the segment doesn't exist
@@ -2181,7 +2227,10 @@ impl CsvBuilder {
                 }
 
                 // Add the total value at the end of the row
+                //if total_pushed == false{
                 row.push(format!("{:.2}", total));
+                //total_pushed = true;
+                //}
 
                 // Ensure the row has the same number of fields as the headers
                 if row.len() != headers.len() {
