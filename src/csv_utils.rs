@@ -6,7 +6,8 @@ use futures::executor::block_on;
 use futures::future::join_all;
 use futures::Future;
 use fuzzywuzzy::fuzz;
-use rand::prelude::*;
+//use rand::prelude::*;
+use rand::{seq::SliceRandom, thread_rng};
 use regex::Regex;
 use serde_json::Value;
 use std::cmp::Ordering;
@@ -757,10 +758,10 @@ impl CsvBuilder {
     }
 
     pub fn cascade_sort<'a>(&'a mut self, orders: Vec<(&'a str, &'a str)>) -> &'a mut Self {
-        println!("cascade_sort called");
+        //println!("cascade_sort called");
 
-        if let Some(header_row) = self.data.first().cloned() {
-            println!("Header row: {:?}", header_row);
+        if let Some(_header_row) = self.data.first().cloned() {
+            //println!("Header row: {:?}", header_row);
 
             // Assuming `self.headers` contains the correct column names
             let column_indices: HashMap<&str, usize> = self
@@ -773,6 +774,7 @@ impl CsvBuilder {
                 })
                 .collect();
 
+            /*
             // Debug print to check if columns are recognized
             for (column_name, order) in &orders {
                 println!("Order for column {}: {}", column_name, order);
@@ -780,6 +782,7 @@ impl CsvBuilder {
                     println!("Column '{}' not found in data!", column_name);
                 }
             }
+            */
 
             self.data[0..].sort_by(|a, b| {
                 let mut cmp = Ordering::Equal;
@@ -1110,7 +1113,6 @@ impl CsvBuilder {
 
         self
     }
-
 
     pub fn limit_where(
         &mut self,
@@ -2164,6 +2166,164 @@ impl CsvBuilder {
         }
 
         combinations
+    }
+
+    pub fn append_fuzzai_analysis_columns_with_values_where(
+        &mut self,
+        column_to_analyze: &str,
+        column_prefix: &str,
+        training_data: Vec<Train>,
+        word_split_param: &str,
+        word_length_sensitivity_param: &str,
+        get_best_param: &str,
+        expressions: Vec<(&str, Exp)>,
+        result_expression: &str,
+    ) -> &mut Self {
+        let headers_clone = self.headers.clone();
+        // Preprocess the column_to_analyze to create the base for new column names
+        let column_base = column_prefix
+            .to_lowercase()
+            .chars()
+            .collect::<String>()
+            .replace(' ', "_");
+
+        let column_index = self
+            .headers
+            .iter()
+            .position(|h| h == column_to_analyze)
+            .unwrap();
+
+        //let mut updated_data: Vec<Vec<String>> = Vec::new();
+
+        // Extracting the number from the word_split_param
+        let split_count = word_split_param
+            .split(':')
+            .nth(1)
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(2); // Default to 2 if parsing fails
+
+        // Extract the sensitivity value
+        let sensitivity = word_length_sensitivity_param
+            .split(':')
+            .nth(1)
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(1.0); // Default to 0.8 if parsing fails
+
+        // Append additional column headers for each rank
+        let get_best_count = get_best_param
+            .split(':')
+            .nth(1)
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(1)
+            .min(3);
+
+        for rank in 1..=get_best_count {
+            self.headers
+                .push(format!("{}_rank{}_fuzzai_result", column_base, rank));
+            self.headers
+                .push(format!("{}_rank{}_fuzzai_result_basis", column_base, rank));
+            self.headers
+                .push(format!("{}_rank{}_fuzzai_score", column_base, rank));
+        }
+
+        for row in &mut self.data {
+            // For each rank, append empty strings for the new columns
+            for _ in 1..=get_best_count {
+                row.push("".to_string()); // For fuzzai_result
+                row.push("".to_string()); // For fuzzai_result_basis
+                row.push("0.0".to_string()); // For fuzz_score, initialized to "0.0"
+            }
+        }
+
+        //let mut updated_data = Vec::new();
+        let mut updates = Vec::new();
+
+        for (row_index, row) in self.data.iter().enumerate() {
+        //for row in &self.data {
+            let mut expr_results = HashMap::new();
+
+            expr_results.insert("true", true);
+            expr_results.insert("false", false);
+
+            for (expr_name, exp) in &expressions {
+                if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                    if let Some(cell_value) = row.get(column_index) {
+                        let result = match &exp.compare_with {
+                            ExpVal::STR(value_str) => {
+                                value_str.apply(cell_value, exp.operator, exp.compare_as)
+                            }
+                            ExpVal::VEC(values) => {
+                                values.apply(cell_value, exp.operator, exp.compare_as)
+                            }
+                        };
+                        expr_results.insert(*expr_name, result);
+                    } else {
+                        expr_results.insert(*expr_name, false);
+                    }
+                } else {
+                    println!("Column '{}' not found in headers.", exp.column);
+                    expr_results.insert(*expr_name, false);
+                }
+            }
+
+            //dbg!(&expr_results, &result_expression);
+
+            let result = self.evaluate_result_expression(&expr_results, result_expression);
+
+            if result {
+                //dbg!(&result);
+                let mut top_matches = Vec::new();
+                // [Perform fuzzai analysis and update row as in append_fuzzai_analysis_columns...]
+                if let Some(value_to_analyze) = row.get(column_index) {
+
+                    //dbg!(&value_to_analyze);
+                    // Generate combinations of words based on the split count
+                    let combinations =
+                        Self::generate_word_combinations(value_to_analyze, split_count);
+
+                    for combo in combinations {
+                        for train in &training_data {
+                            let score = fuzz::ratio(&combo, train.input) as f64;
+                            // Calculate word length difference
+                            let word_length_difference =
+                                ((combo.len() as isize) - (train.input.len() as isize)).abs()
+                                    as f64;
+                            // Adjust score based on word length difference
+                            let adjusted_score = (score as f64)
+                                * (1.0 - (sensitivity * word_length_difference / 100.0));
+
+                            // Push each score and corresponding result into top_matches
+                            top_matches.push((adjusted_score, train.output, train.input));
+                        }
+                    }
+                }
+
+                top_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                top_matches.truncate(get_best_count);
+                //dbg!(&row.get(column_index), &top_matches);
+
+                 //updated_data.push(row_clone);
+                 updates.push((row_index, top_matches));
+            } 
+
+        }
+
+        //self.data = updated_data;
+
+    // Step 2: Apply updates
+    for (row_index, top_matches) in updates {
+        let row = &mut self.data[row_index];
+        let fuzzai_results_start_index = row.len() - (get_best_count * 3);
+
+        for (i, (score, result, basis)) in top_matches.iter().enumerate() {
+            let offset = i * 3; // 3 columns per rank
+            row[fuzzai_results_start_index + offset] = result.to_string();
+            row[fuzzai_results_start_index + offset + 1] = basis.to_string();
+            row[fuzzai_results_start_index + offset + 2] = score.to_string();
+        }
+    }
+
+        self
     }
 
     /// Evaluates truth statements

@@ -158,7 +158,7 @@ Example 3: Load from an xls file
 
 #### Chainable Options
 
-    use rgwml::csv_utils::{CsvBuilder, Exp, ExpVal, Piv, CalibConfig};
+    use rgwml::csv_utils::{CalibConfig, CsvBuilder, CsvConverter, CsvResultCacher, Exp, ExpVal, Piv, Train};
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
     // A. Calibrating an irrugularly formatted file
@@ -369,6 +369,32 @@ Example 3: Load from an xls file
         "WORD_SPLIT:2", // The minimum length of word combinations that training data is to be broken into
         "WORD_LENGTH_SENSITIVITY:0.8", // Multiplies differences in word length between training data input and the value being analyzed by 0.8
         "GET_BEST:2" // Get the top 2 results, max value is 3
+        )
+    .append_fuzzai_analysis_columns_with_values_where(
+        "Column1", // Name of column to be analyzed
+        "sales_analysis", // Identifier for newly created column
+        vec![
+            Train {
+                input: "I want my money back",
+                output: "refund"
+            },
+            Train {
+                input: "I want a refund immediately",
+                output: "refund"
+            },
+        ],
+        "WORD_SPLIT:2", // The minimum length of word combinations that training data is to be broken into
+        "WORD_LENGTH_SENSITIVITY:0.8", // Multiplies differences in word length between training data input and the value being analyzed by 0.8
+        "GET_BEST:2", // Get the top 2 results, max value is 3
+        vec![
+            ("Exp1", Exp {
+                column: "Deposit Amt.",
+                operator: ">",
+                compare_with: ExpVal::STR("500"),
+                compare_as: "NUMBERS" // Also: "TEXT", "TIMESTAMPS"
+            }),
+        ],
+        "Exp1", // Filters rows where fuzzai analysis would be applied
         )
     .split_date_as_appended_category_columns("Column10", "%d/%m/%y") // Appends additional columns splitting a date/timestamp into categorization columns by year, month and week
 
