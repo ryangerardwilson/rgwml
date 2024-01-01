@@ -6,6 +6,7 @@ use futures::executor::block_on;
 use futures::future::join_all;
 use futures::Future;
 use fuzzywuzzy::fuzz;
+use rand::prelude::*;
 use regex::Regex;
 use serde_json::Value;
 use std::cmp::Ordering;
@@ -86,7 +87,7 @@ impl CompareValue for &str {
     fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool {
         // Simplified example, implement the logic as per your requirement
         match compare_as {
-            "COMPARE_AS_TEXT" => match operation {
+            "TEXT" => match operation {
                 "==" => cell_value == *self,
                 "CONTAINS" => cell_value.contains(*self),
                 "STARTS_WITH" => cell_value.starts_with(*self),
@@ -94,21 +95,7 @@ impl CompareValue for &str {
                 _ => false,
             },
 
-            /*
-            "COMPARE_AS_NUMBERS" => match (cell_value.parse::<f64>(), self.parse::<f64>()) {
-                (Ok(n1), Ok(n2)) => match operation {
-                    "==" => n1 == n2,
-                    ">" => n1 > n2,
-                    "<" => n1 < n2,
-                    _ => false,
-                },
-                _ => {
-                    println!("Failed to parse as numbers: '{}' or '{}'", cell_value, self);
-                    false
-                }
-            },
-            */
-            "COMPARE_AS_NUMBERS" => {
+            "NUMBERS" => {
                 // Check if cell_value is empty and provide a default value if needed
                 let cell_value = if cell_value.trim().is_empty() {
                     "0"
@@ -139,7 +126,7 @@ impl CompareValue for &str {
                 }
             }
 
-            "COMPARE_AS_TIMESTAMPS" => {
+            "TIMESTAMPS" => {
                 let parsed_row_value = CsvBuilder::parse_timestamp(cell_value);
                 let parsed_compare_value = CsvBuilder::parse_timestamp(self);
 
@@ -1120,6 +1107,76 @@ impl CsvBuilder {
         if self.data.len() > limit {
             self.data.truncate(limit);
         }
+
+        self
+    }
+
+
+    pub fn limit_where(
+        &mut self,
+        limit: usize,
+        expressions: Vec<(&str, Exp)>,
+        result_expression: &str,
+        selection_strategy: &str,
+    ) -> &mut Self {
+        let headers_clone = self.headers.clone();
+        let drained_data = self.data.drain(..).collect::<Vec<_>>();
+
+        let mut filtered_data = Vec::new();
+        let mut remaining_data = Vec::new();
+
+        for row in drained_data {
+            let mut expr_results = HashMap::new();
+            expr_results.insert("true", true);
+            expr_results.insert("false", false);
+
+            for (expr_name, exp) in &expressions {
+                if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                    if let Some(cell_value) = row.get(column_index) {
+                        let result = match &exp.compare_with {
+                            ExpVal::STR(value_str) => {
+                                value_str.apply(cell_value, exp.operator, exp.compare_as)
+                            }
+                            ExpVal::VEC(values) => {
+                                values.apply(cell_value, exp.operator, exp.compare_as)
+                            }
+                        };
+                        expr_results.insert(*expr_name, result);
+                    } else {
+                        expr_results.insert(*expr_name, false);
+                    }
+                } else {
+                    println!("Column '{}' not found in headers.", exp.column);
+                    expr_results.insert(*expr_name, false);
+                }
+            }
+
+            let result = self.evaluate_result_expression(&expr_results, result_expression);
+
+            if result {
+                filtered_data.push(row);
+            } else {
+                remaining_data.push(row);
+            }
+        }
+
+        match selection_strategy {
+            "TAKE:FIRST" => {
+                self.data = filtered_data.into_iter().take(limit).collect();
+            }
+            "TAKE:LAST" => {
+                self.data = filtered_data.into_iter().rev().take(limit).collect();
+            }
+            "TAKE:RANDOM" => {
+                filtered_data.shuffle(&mut thread_rng());
+                self.data = filtered_data.into_iter().take(limit).collect();
+            }
+            _ => {
+                self.data = filtered_data.into_iter().take(limit).collect();
+            }
+        }
+
+        self.data.extend(remaining_data);
 
         self
     }
@@ -2421,6 +2478,13 @@ impl CsvBuilder {
             eprintln!("Error writing to CSV: {}", e);
         }
 
+        self
+    }
+
+    #[allow(unreachable_code)]
+    pub fn die(&mut self) -> &mut Self {
+        println!("Giving up the ghost!");
+        std::process::exit(0);
         self
     }
 }

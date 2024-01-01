@@ -130,25 +130,25 @@ Example 3: Load from an xls file
                     column: "customer_type",
                     operator: "==",
                     compare_with: ExpVal::STR("REGULAR"),
-                    compare_as: "COMPARE_AS_TEXT"
+                    compare_as: "TEXT" // Also: "NUMBERS", "TIMESTAMPS"
                 }),
                 ("Exp2", Exp {
                     column: "invoice_data",
                     operator: ">",
                     compare_with: ExpVal::STR("2023-12-31 23:59:59"),
-                    compare_as: "COMPARE_AS_TEXT"
+                    compare_as: "TEXT"
                 }),
                 ("Exp3", Exp {
                     column: "invoice_amount",
                     operator: "<",
                     compare_with: ExpVal::STR("1000"),
-                    compare_as: "COMPARE_AS_NUMBERS"
+                    compare_as: "NUMBERS"
                 }),
                 ("Exp4", Exp {
                     column: "address",
                     operator: "FUZZ_MIN_SCORE_60",
                     compare_with: ExpVal::VEC(vec!["public school"]),
-                    compare_as: "COMPARE_AS_TEXT"
+                    compare_as: "TEXT"
                 })
             ],
             "Exp1 && (Exp2 || Exp3) && Exp4",
@@ -194,6 +194,25 @@ Example 3: Load from an xls file
     
     // G. Limiting and sorting
     .limit(10)
+    .limit_where(
+        10,
+        vec![
+            ("Exp1", Exp {
+                column: "Withdrawal Amt.",
+                operator: "<",
+                compare_with: ExpVal::STR("1000"),
+                compare_as: "NUMBERS" // Also: "TEXT", "TIMESTAMPS"
+            }),
+            ("Exp2", Exp {
+                column: "Withdrawal Type",
+                operator: "==",
+                compare_with: ExpVal::STR("Urgent"),
+                compare_as: "TEXT"
+            }),
+        ],
+        "Exp1 && Exp2",
+        "TAKE:FIRST" // Also: TAKE:LAST, TAKE:RANDOM
+        )
     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
     
     // H. Applying conditional operations
@@ -203,43 +222,43 @@ Example 3: Load from an xls file
                 column: "customer_type",
                 operator: "==",
                 compare_with: ExpVal::STR("REGULAR"),
-                compare_as: "COMPARE_AS_TEXT"
+                compare_as: "TEXT" // Also: "NUMBERS", "TIMESTAMPS"
             }),
             ("Exp2", Exp {
                 column: "invoice_data",
                 operator: ">",
                 compare_with: ExpVal::STR("2023-12-31 23:59:59"),
-                compare_as: "COMPARE_AS_TEXT"
+                compare_as: "TEXT"
             }),
             ("Exp3", Exp {
                 column: "invoice_amount",
                 operator: "<",
                 compare_with: ExpVal::STR("1000"),
-                compare_as: "COMPARE_AS_NUMBERS"
+                compare_as: "NUMBERS"
             }),
             ("Exp4", Exp {
                 column: "address",
                 operator: "FUZZ_MIN_SCORE_60",
                 compare_with: ExpVal::VEC(vec!["public school"]),
-                compare_as: "COMPARE_AS_TEXT"
+                compare_as: "TEXT"
             }),
             ("Exp5", Exp {
                 column: "status",
                 operator: "CONTAINS",
                 compare_with: ExpVal::STR("REJECTED"),
-                compare_as: "COMPARE_AS_TEXT"
+                compare_as: "TEXT"
             }),
             ("Exp6", Exp {
                 column: "status",
                 operator: "DOES_NOT_CONTAIN",
                 compare_with: ExpVal::STR("HAS NOT PAID"),
-                compare_as: "COMPARE_AS_TEXT"
+                compare_as: "TEXT"
             }),
             ("Exp7", Exp {
                 column: "status",
                 operator: "STARTS_WITH",
                 compare_with: ExpVal::STR("VERIFIED"),
-                compare_as: "COMPARE_AS_TEXT"
+                compare_as: "TEXT"
             }),
         ],
         "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
@@ -309,7 +328,7 @@ Example 3: Load from an xls file
                         column: "Withdrawal Amt.",
                         operator: "<",
                         compare_with: ExpVal::STR("1000"),
-                        compare_as: "COMPARE_AS_NUMBERS"
+                        compare_as: "NUMBERS" // Also: "TEXT", "TIMESTAMPS"
                     }),
                 ],
                 "Exp1"
@@ -321,13 +340,13 @@ Example 3: Load from an xls file
                         column: "Withdrawal Amt.",
                         operator: ">=",
                         compare_with: ExpVal::STR("1000"),
-                        compare_as: "COMPARE_AS_NUMBERS"
+                        compare_as: "NUMBERS"
                     }),
                     ("Exp2", Exp {
                         column: "Withdrawal Amt.",
                         operator: "<",
                         compare_with: ExpVal::STR("5000"),
-                        compare_as: "COMPARE_AS_NUMBERS"
+                        compare_as: "NUMBERS"
                     }),
                 ],
                 "Exp1 && Exp2"
@@ -368,6 +387,9 @@ Example 3: Load from an xls file
 
     // O. Save
     .save_as("/path/to/your/file2.csv")
+
+    // P. Die
+    .die() // Gracefully terminates execution of a CsvBuilder chain
 
 #### Extract Data
 
