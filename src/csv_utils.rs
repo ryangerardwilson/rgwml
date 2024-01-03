@@ -424,25 +424,21 @@ impl CsvBuilder {
 
     /// Sets the CSV header using an array of strings.
     pub fn set_header(&mut self, header: Vec<&str>) -> &mut Self {
-        if self.error.is_none() {
-            let header_row = header.into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
-
-            // If data already contains rows, shift them down
-            if !self.data.is_empty() {
-                // Create a new data vector with the header at the start
-                let mut new_data = Vec::new();
-                new_data.push(header_row);
-
-                // Append existing rows to the new data vector
-                new_data.append(&mut self.data);
-
-                // Replace old data with the new data
-                self.data = new_data;
-            } else {
-                // If no rows, simply insert the header
-                self.data.push(header_row);
-            }
+        // Convert the header slice into a Vec<String>
+        let header_row = header.into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+        
+        // If there's an existing error, don't modify the builder
+        if self.error.is_some() {
+            return self;
         }
+        
+        // Assign the new headers
+        self.headers = header_row;
+
+        // If there's already data present, we need to ensure the headers are not duplicated.
+        // Since headers are separate from data, we don't insert them into `data`.
+        // The `headers` field will be written out when exporting the CSV.
+
         self
     }
 
