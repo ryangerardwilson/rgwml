@@ -427,13 +427,14 @@ impl CsvBuilder {
         if self.error.is_none() {
             let header_row = header.into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
 
-            if !self.header_set {
-                // Insert the header at the top if it's not already set
+            // Check if the data already has rows
+            if self.data.is_empty() {
+                // If no rows, simply insert the header
                 self.data.insert(0, header_row);
-                self.header_set = true;
             } else {
-                // If header is already set, replace the existing header
-                self.data[0] = header_row;
+                // If rows exist, insert the header and shift rows down
+                self.data.insert(0, header_row);
+                // Additional logic to shift rows down if necessary
             }
         }
         self
