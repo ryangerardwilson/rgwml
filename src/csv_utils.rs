@@ -425,13 +425,16 @@ impl CsvBuilder {
     /// Sets the CSV header using an array of strings.
     pub fn set_header(&mut self, header: Vec<&str>) -> &mut Self {
         // Convert the header slice into a Vec<String>
-        let header_row = header.into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
-        
+        let header_row = header
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+
         // If there's an existing error, don't modify the builder
         if self.error.is_some() {
             return self;
         }
-        
+
         // Assign the new headers
         self.headers = header_row;
 
@@ -2129,9 +2132,48 @@ impl CsvBuilder {
                 }
             }
 
+            /*
             top_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
             top_matches.truncate(get_best_count);
             //dbg!(&row.get(column_index), &top_matches);
+            */
+
+            // Sort and truncate the list to get the best matches
+            top_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+            top_matches.truncate(get_best_count);
+
+            // Initialize longest_value as None
+            let mut longest_value: Option<(&f64, &str, &str)> = None;
+            for match_ in &top_matches {
+                // Destructure match_ into its components
+                let (score, output, input) = match_;
+
+                // Check if this match_ has the longest input string
+                if longest_value.is_none() || input.len() > longest_value.unwrap().2.len() {
+                    // Update longest_value with references to the components of match_
+                    longest_value = Some((score, output, input));
+                }
+            }
+
+            // Collect the indices and inputs of top_matches in a separate vector
+            let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
+                .iter()
+                .enumerate()
+                .map(|(index, match_)| (index, match_.2))
+                .collect();
+
+            // Check if the fuzz value of the longest value is more than 85 and adjust scores
+            if let Some((score, _, longest_input)) = longest_value {
+                if *score > 85.0 {
+                    for (index, match_input) in match_indices_and_inputs {
+                        if match_input == longest_input {
+                            top_matches[index].0 = 100.0; // Boost the longest value's score to 100
+                        } else {
+                            top_matches[index].0 *= 0.95; // Decrement other values' scores
+                        }
+                    }
+                }
+            }
 
             let mut row_clone = row.clone();
             //dbg!(&top_matches, &row_clone);
@@ -2250,7 +2292,7 @@ impl CsvBuilder {
         let mut updates = Vec::new();
 
         for (row_index, row) in self.data.iter().enumerate() {
-        //for row in &self.data {
+            //for row in &self.data {
             let mut expr_results = HashMap::new();
 
             expr_results.insert("true", true);
@@ -2286,7 +2328,6 @@ impl CsvBuilder {
                 let mut top_matches = Vec::new();
                 // [Perform fuzzai analysis and update row as in append_fuzzai_analysis_columns...]
                 if let Some(value_to_analyze) = row.get(column_index) {
-
                     //dbg!(&value_to_analyze);
                     // Generate combinations of words based on the split count
                     let combinations =
@@ -2309,30 +2350,67 @@ impl CsvBuilder {
                     }
                 }
 
+                /*
                 top_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
                 top_matches.truncate(get_best_count);
                 //dbg!(&row.get(column_index), &top_matches);
+                */
+                // Sort and truncate the list to get the best matches
+                top_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                top_matches.truncate(get_best_count);
 
-                 //updated_data.push(row_clone);
-                 updates.push((row_index, top_matches));
-            } 
+                // Initialize longest_value as None
+                let mut longest_value: Option<(&f64, &str, &str)> = None;
+                for match_ in &top_matches {
+                    // Destructure match_ into its components
+                    let (score, output, input) = match_;
 
+                    // Check if this match_ has the longest input string
+                    if longest_value.is_none() || input.len() > longest_value.unwrap().2.len() {
+                        // Update longest_value with references to the components of match_
+                        longest_value = Some((score, output, input));
+                    }
+                }
+
+                // Collect the indices and inputs of top_matches in a separate vector
+                let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
+                    .iter()
+                    .enumerate()
+                    .map(|(index, match_)| (index, match_.2))
+                    .collect();
+
+                // Check if the fuzz value of the longest value is more than 85 and adjust scores
+                if let Some((score, _, longest_input)) = longest_value {
+                    if *score > 85.0 {
+                        for (index, match_input) in match_indices_and_inputs {
+                            if match_input == longest_input {
+                                top_matches[index].0 = 100.0; // Boost the longest value's score to 100
+                            } else {
+                                top_matches[index].0 *= 0.95; // Decrement other values' scores
+                            }
+                        }
+                    }
+                }
+
+                //updated_data.push(row_clone);
+                updates.push((row_index, top_matches));
+            }
         }
 
         //self.data = updated_data;
 
-    // Step 2: Apply updates
-    for (row_index, top_matches) in updates {
-        let row = &mut self.data[row_index];
-        let fuzzai_results_start_index = row.len() - (get_best_count * 3);
+        // Step 2: Apply updates
+        for (row_index, top_matches) in updates {
+            let row = &mut self.data[row_index];
+            let fuzzai_results_start_index = row.len() - (get_best_count * 3);
 
-        for (i, (score, result, basis)) in top_matches.iter().enumerate() {
-            let offset = i * 3; // 3 columns per rank
-            row[fuzzai_results_start_index + offset] = result.to_string();
-            row[fuzzai_results_start_index + offset + 1] = basis.to_string();
-            row[fuzzai_results_start_index + offset + 2] = score.to_string();
+            for (i, (score, result, basis)) in top_matches.iter().enumerate() {
+                let offset = i * 3; // 3 columns per rank
+                row[fuzzai_results_start_index + offset] = result.to_string();
+                row[fuzzai_results_start_index + offset + 1] = basis.to_string();
+                row[fuzzai_results_start_index + offset + 2] = score.to_string();
+            }
         }
-    }
 
         self
     }

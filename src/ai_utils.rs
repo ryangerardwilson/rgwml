@@ -97,11 +97,26 @@ pub async fn fuzzai<'a>(
     ) -> Option<SimilarityResult> {
         let mut all_futures: Vec<Pin<Box<dyn Future<Output = SimilarityResult>>>> = Vec::new();
 
+        let mut max_similarity: f32 = 0.0;
+        let mut max_similarity_word_length = 0;
+
         for row in data_arc.as_ref().iter() {
             let input_word_count = row.input.split_whitespace().count() as i32;
             let items_to_process_lower = items_to_process.to_lowercase();
 
-            let similarity = fuzz::ratio(&items_to_process_lower, &row.input);
+            let similarity = fuzz::ratio(&items_to_process_lower, &row.input) as f32;
+
+            let current_longest_word_length = row
+                .input
+                .split_whitespace()
+                .map(str::len)
+                .max()
+                .unwrap_or(0);
+
+            if similarity > max_similarity {
+                max_similarity = similarity as f32;
+                max_similarity_word_length = current_longest_word_length;
+            }
 
             match word_length_sensitivity {
                 WordLengthSensitivity::None => {
@@ -149,7 +164,31 @@ pub async fn fuzzai<'a>(
 
         let results = join_all(all_futures).await;
 
-        let best_result = results.clone().into_iter().max_by(|a, b| {
+        let mut final_results: Vec<SimilarityResult> = Vec::new();
+        for result in results {
+            let longest_word_length = result
+                .input
+                .split_whitespace()
+                .map(str::len)
+                .max()
+                .unwrap_or(0);
+
+            if longest_word_length == max_similarity_word_length && result.similarity > 80.0 {
+                final_results.push(SimilarityResult {
+                    similarity: 100.0,
+                    input: result.input.clone(),
+                    output: result.output.clone(),
+                });
+            } else {
+                final_results.push(SimilarityResult {
+                    similarity: result.similarity * 0.9,
+                    input: result.input.clone(),
+                    output: result.output.clone(),
+                });
+            }
+        }
+
+        let best_result = final_results.into_iter().max_by(|a, b| {
             a.similarity
                 .partial_cmp(&b.similarity)
                 .unwrap_or(std::cmp::Ordering::Equal)
