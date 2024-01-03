@@ -90,6 +90,7 @@ impl CompareValue for &str {
         match compare_as {
             "TEXT" => match operation {
                 "==" => cell_value == *self,
+                "!=" => cell_value != *self,
                 "CONTAINS" => cell_value.contains(*self),
                 "STARTS_WITH" => cell_value.starts_with(*self),
                 "DOES_NOT_CONTAIN" => !cell_value.contains(*self),
@@ -783,36 +784,34 @@ impl CsvBuilder {
                 .iter()
                 .enumerate()
                 .map(|(i, name)| {
-                    println!("Column name found: '{}'", name); // Debug print
+                    //println!("Column name found: '{}'", name); // Debug print
                     (name.as_str(), i)
                 })
                 .collect();
-
-            /*
-            // Debug print to check if columns are recognized
-            for (column_name, order) in &orders {
-                println!("Order for column {}: {}", column_name, order);
-                if column_indices.get(column_name).is_none() {
-                    println!("Column '{}' not found in data!", column_name);
-                }
-            }
-            */
 
             self.data[0..].sort_by(|a, b| {
                 let mut cmp = Ordering::Equal;
                 for (column_name, order) in &orders {
                     if let Some(&index) = column_indices.get(column_name) {
-                        let default_val = if order == &"DESC" { f64::MIN } else { 0.0 };
-                        let a_num = a[index].parse::<f64>().unwrap_or(default_val);
-                        let b_num = b[index].parse::<f64>().unwrap_or(default_val);
+                        let a_val = &a[index];
+                        let b_val = &b[index];
 
-                        // Debug print
-                        //println!("Comparing {} and {} in column {}", a_num, b_num, column_name);
-
-                        cmp = if order == &"ASC" {
-                            a_num.partial_cmp(&b_num).unwrap_or(Ordering::Equal)
+                        cmp = if let (Ok(a_num), Ok(b_num)) =
+                            (a_val.parse::<f64>(), b_val.parse::<f64>())
+                        {
+                            // Both values are numbers, compare as f64
+                            if order == &"ASC" {
+                                a_num.partial_cmp(&b_num).unwrap_or(Ordering::Equal)
+                            } else {
+                                b_num.partial_cmp(&a_num).unwrap_or(Ordering::Equal)
+                            }
                         } else {
-                            b_num.partial_cmp(&a_num).unwrap_or(Ordering::Equal)
+                            // At least one value is not a number, compare as string
+                            if order == &"ASC" {
+                                a_val.cmp(b_val)
+                            } else {
+                                b_val.cmp(a_val)
+                            }
                         };
 
                         if cmp != Ordering::Equal {
@@ -823,6 +822,7 @@ impl CsvBuilder {
                 cmp
             });
         }
+
         self
     }
 
