@@ -427,14 +427,20 @@ impl CsvBuilder {
         if self.error.is_none() {
             let header_row = header.into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
 
-            // Check if the data already has rows
-            if self.data.is_empty() {
-                // If no rows, simply insert the header
-                self.data.insert(0, header_row);
+            // If data already contains rows, shift them down
+            if !self.data.is_empty() {
+                // Create a new data vector with the header at the start
+                let mut new_data = Vec::new();
+                new_data.push(header_row);
+
+                // Append existing rows to the new data vector
+                new_data.append(&mut self.data);
+
+                // Replace old data with the new data
+                self.data = new_data;
             } else {
-                // If rows exist, insert the header and shift rows down
-                self.data.insert(0, header_row);
-                // Additional logic to shift rows down if necessary
+                // If no rows, simply insert the header
+                self.data.push(header_row);
             }
         }
         self
