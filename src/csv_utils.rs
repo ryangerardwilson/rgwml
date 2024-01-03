@@ -425,8 +425,16 @@ impl CsvBuilder {
     /// Sets the CSV header using an array of strings.
     pub fn set_header(&mut self, header: Vec<&str>) -> &mut Self {
         if self.error.is_none() {
-            let header_row = header.into_iter().map(|s| s.to_string()).collect();
-            self.data.insert(0, header_row);
+            let header_row = header.into_iter().map(|s| s.to_string()).collect::<Vec<String>>();
+
+            if !self.header_set {
+                // Insert the header at the top if it's not already set
+                self.data.insert(0, header_row);
+                self.header_set = true;
+            } else {
+                // If header is already set, replace the existing header
+                self.data[0] = header_row;
+            }
         }
         self
     }
