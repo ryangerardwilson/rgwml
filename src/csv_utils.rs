@@ -6,7 +6,6 @@ use futures::executor::block_on;
 use futures::future::join_all;
 use futures::Future;
 use fuzzywuzzy::fuzz;
-//use rand::prelude::*;
 use rand::{seq::SliceRandom, thread_rng};
 use regex::Regex;
 use serde_json::Value;
@@ -202,8 +201,6 @@ pub struct Piv {
     pub values_from: &'static str,
     pub operation: &'static str,
     pub seggregate_by: Vec<(&'static str, &'static str)>,
-    //pub seggregate_by: Vec<&'static str>,
-    //pub seggregation_direction: &'static str,
 }
 
 pub struct CalibConfig {
@@ -680,6 +677,90 @@ impl CsvBuilder {
         }
         self
     }
+
+
+    /*
+    /// Prints an abbreviated table of the CSV data.
+    pub fn print_table(&mut self) -> &mut Self {
+        // Define the number of rows to show at the start and end
+        let show_rows = 5;
+
+        let total_rows = self.data.len();
+        let total_cols = self.headers.len();
+
+        // Print the headers
+        println!("\n{}", self.headers.join(", "));
+
+        // Print top rows
+        for row in self.data.iter().take(show_rows) {
+            println!("{}", row.join(", "));
+        }
+
+        // Print ellipsis if the table is long
+        if total_rows > 2 * show_rows {
+            println!("... ({} rows omitted) ...", total_rows - 2 * show_rows);
+        }
+
+        // Print bottom rows
+        for row in self.data.iter().rev().take(show_rows).rev() {
+            println!("{}", row.join(", "));
+        }
+
+        // For wide tables, you might want to truncate or wrap columns.
+        // This part is left as an exercise.
+
+        self
+    }
+    */
+
+    /// Prints an abbreviated table of the CSV data with lines and consistent spacing for cells.
+    pub fn print_table(&mut self) -> &mut Self {
+        let show_rows = 5; // Number of rows to show at the start and end
+
+        let total_rows = self.data.len();
+
+        // Function to truncate and pad string to 10 characters
+        let format_cell = |s: &String| -> String {
+            format!("{:10.10}", s.as_str())
+        };
+
+        // Calculate total table width
+        let table_width = self.headers.len() * 12 + 1;
+
+        // Print the headers
+        println!("\n|{}|", self.headers.iter().map(&format_cell).collect::<Vec<String>>().join("|"));
+        println!("{}", "-".repeat(table_width));
+
+        // Print function for rows
+        let print_row = |row: &Vec<String>| {
+            println!("|{}|", row.iter().map(&format_cell).collect::<Vec<String>>().join("|"));
+        };
+
+        //dbg!(&self.data.iter(), &self.headers.iter());
+
+        // Print the first `show_rows`
+        for row in self.data.iter().take(show_rows) {
+            print_row(row);
+        }
+
+        // Check if ellipsis and bottom rows are needed
+        if total_rows > 2 * show_rows {
+            // Print ellipsis
+            println!("... ({} rows omitted) ...", total_rows - 2 * show_rows);
+
+            // Print the last `show_rows`
+            for row in self.data.iter().skip(total_rows - show_rows) {
+                print_row(row);
+            }
+        } else if total_rows > show_rows {
+            // Print the remaining rows if total is greater than show_rows
+            for row in self.data.iter().skip(show_rows).take(total_rows - show_rows) {
+                print_row(row);
+            }
+        }
+
+        self
+    }    
 
     /// Aesthetically prints the frequency of all unique values in the indicated columns, sorted by frequency.
     pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
