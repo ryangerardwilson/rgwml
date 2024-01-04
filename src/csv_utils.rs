@@ -2249,9 +2249,12 @@ impl CsvBuilder {
                     for (index, match_input) in match_indices_and_inputs {
                         if match_input == longest_input {
                             top_matches[index].0 = 100.0; // Boost the longest value's score to 100
-                        } else {
+                        } 
+                        /*
+                        else {
                             top_matches[index].0 *= 0.95; // Decrement other values' scores
                         }
+                        */
                     }
                 }
             }

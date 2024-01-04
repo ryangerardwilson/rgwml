@@ -179,13 +179,17 @@ pub async fn fuzzai<'a>(
                     input: result.input.clone(),
                     output: result.output.clone(),
                 });
-            } else {
+            } 
+
+            /*
+            else {
                 final_results.push(SimilarityResult {
                     similarity: result.similarity * 0.9,
                     input: result.input.clone(),
                     output: result.output.clone(),
                 });
             }
+            */
         }
 
         let best_result = final_results.into_iter().max_by(|a, b| {
