@@ -2820,6 +2820,31 @@ impl CsvBuilder {
         std::process::exit(0);
         self
     }
+
+    // Method to check if the builder has any data (headers or rows)
+    pub fn has_data(&self) -> bool {
+        !self.headers.is_empty() || !self.data.is_empty()
+    }
+
+    // Method to check if the builder has headers
+    pub fn has_headers(&self) -> bool {
+        !self.headers.is_empty()
+    }
+
+    // Method to get the headers
+    pub fn get_headers(&self) -> Option<&[String]> {
+        if self.has_headers() {
+            Some(&self.headers)
+        } else {
+            None
+        }
+    }
+
+    // Method to get a reference to the CSV data
+    pub fn get_data(&self) -> &Vec<Vec<String>> {
+        &self.data
+    }
+
 }
 
 /// Represents a caching mechanism for CSV results, holding a data generator, cache path, and cache duration.
