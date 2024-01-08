@@ -420,7 +420,7 @@ Example 3: Load from an xls file
 
 #### Extract Data
 
-These methods return a CsvBuilder object, and hence, can not be subsequently chained.
+These methods return specific data, instead of a mutable CsvBuilder object, and hence, can not be subsequently chained.
 
     CsvBuilder::from_csv("/path/to/your/file1.csv")
 
@@ -434,6 +434,10 @@ These methods return a CsvBuilder object, and hence, can not be subsequently cha
             ]),
             ("Column2", vec![("NO_GROUPINGS", vec![])])
         ])
+    .has_data() // Returns `true` if either headers or data rows are present, `false` otherwise.
+    .has_headers() // Returns `true` if headers are present, `false` otherwise.
+    .get_headers() // Returns an Option<&[String]> containing a reference to the headers if present, `None` otherwise.
+    .get_data() // Returns a reference to the data contained in the builder as a &Vec<Vec<String>>.
 
 ### CsvResultCacher
 
