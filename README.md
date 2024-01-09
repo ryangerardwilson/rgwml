@@ -116,6 +116,18 @@ Example 3: Load from an xls file
         
     let builder = CsvBuilder::from_xls("/path/to/existing/file.xls", 1); // Loads from the first sheet of the .xls file
 
+Example 4: Load from raw data
+
+    use rgwml::csv_utils::CsvBuilder;
+
+    let headers = vec!["Header1".to_string(), "Header2".to_string(), "Header3".to_string()];
+    let data = vec![
+        vec!["Row1-1".to_string(), "Row1-2".to_string(), "Row1-3".to_string()],
+        vec!["Row2-1".to_string(), "Row2-2".to_string(), "Row2-3".to_string()],
+    ];
+
+    let builder = CsvBuilder::from_raw_data(headers, data);
+
 ####  Manipulating a CsvBuilder Object for Analysis or Saving
 
     use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};

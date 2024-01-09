@@ -179,7 +179,7 @@ pub async fn fuzzai<'a>(
                     input: result.input.clone(),
                     output: result.output.clone(),
                 });
-            } 
+            }
 
             /*
             else {

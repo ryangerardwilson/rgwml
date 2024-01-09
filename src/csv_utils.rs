@@ -302,6 +302,16 @@ impl CsvBuilder {
         builder
     }
 
+    /// Creates a `CsvBuilder` instance from headers and data.
+    pub fn from_raw_data(headers: Vec<String>, data: Vec<Vec<String>>) -> Self {
+        CsvBuilder {
+            headers,
+            data,
+            limit: None,
+            error: None,
+        }
+    }
+
     /// Calibrates a poorly formatted Csv File
     pub fn calibrate(&mut self, config: CalibConfig) -> &mut Self {
         // Parse header_is_at_row to usize, default to 0 if parsing fails
@@ -678,7 +688,6 @@ impl CsvBuilder {
         self
     }
 
-
     /*
     /// Prints an abbreviated table of the CSV data.
     pub fn print_table(&mut self) -> &mut Self {
@@ -720,20 +729,31 @@ impl CsvBuilder {
         let total_rows = self.data.len();
 
         // Function to truncate and pad string to 10 characters
-        let format_cell = |s: &String| -> String {
-            format!("{:10.10}", s.as_str())
-        };
+        let format_cell = |s: &String| -> String { format!("{:10.10}", s.as_str()) };
 
         // Calculate total table width
         let table_width = self.headers.len() * 12 + 1;
 
         // Print the headers
-        println!("\n|{}|", self.headers.iter().map(&format_cell).collect::<Vec<String>>().join("|"));
+        println!(
+            "\n|{}|",
+            self.headers
+                .iter()
+                .map(&format_cell)
+                .collect::<Vec<String>>()
+                .join("|")
+        );
         println!("{}", "-".repeat(table_width));
 
         // Print function for rows
         let print_row = |row: &Vec<String>| {
-            println!("|{}|", row.iter().map(&format_cell).collect::<Vec<String>>().join("|"));
+            println!(
+                "|{}|",
+                row.iter()
+                    .map(&format_cell)
+                    .collect::<Vec<String>>()
+                    .join("|")
+            );
         };
 
         //dbg!(&self.data.iter(), &self.headers.iter());
@@ -754,13 +774,18 @@ impl CsvBuilder {
             }
         } else if total_rows > show_rows {
             // Print the remaining rows if total is greater than show_rows
-            for row in self.data.iter().skip(show_rows).take(total_rows - show_rows) {
+            for row in self
+                .data
+                .iter()
+                .skip(show_rows)
+                .take(total_rows - show_rows)
+            {
                 print_row(row);
             }
         }
 
         self
-    }    
+    }
 
     /// Aesthetically prints the frequency of all unique values in the indicated columns, sorted by frequency.
     pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
@@ -2249,7 +2274,7 @@ impl CsvBuilder {
                     for (index, match_input) in match_indices_and_inputs {
                         if match_input == longest_input {
                             top_matches[index].0 = 100.0; // Boost the longest value's score to 100
-                        } 
+                        }
                         /*
                         else {
                             top_matches[index].0 *= 0.95; // Decrement other values' scores
@@ -2844,7 +2869,6 @@ impl CsvBuilder {
     pub fn get_data(&self) -> &Vec<Vec<String>> {
         &self.data
     }
-
 }
 
 /// Represents a caching mechanism for CSV results, holding a data generator, cache path, and cache duration.
