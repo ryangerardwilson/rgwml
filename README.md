@@ -7,10 +7,16 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 1. Overview
 -----------
 
+## `db_utils`
+
+- **Purpose**: Query various SQL databases with simple elegant syntax.
+- **Features**: This module supports the following database connections:
+  - MSSQL Server
+
 ## `csv_utils`
 
 - **Purpose**: A Comprehensive Toolkit for CSV File Management, in AI/ML pipelines.
-- **Features**: `csv_utils` offers a powerful suite of tools designed for efficient and flexible handling of CSV files. Key components include:
+- **Features**: Offers a powerful suite of tools designed for efficient and flexible handling of CSV files. Key components include:
   - **CsvBuilder**: A versatile builder for creating and manipulating CSV files, facilitating:
     - **Easy Initialization**: Start with a new CSV or load from an existing file.
     - **Custom Headers and Rows**: Set custom headers and add rows effortlessly.
@@ -41,7 +47,28 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 - **Features**: 
   - **FutureLoop**: Handle multiple tasks simultaneously when working with lists or collections, while working with a fluent interface.
 
-2. csv_utils
+2. `db_utils`
+-----------
+
+### MSSQL Server: Connect and query
+
+    use rgwml::db_utils::DbConnect;
+
+    #[tokio::main]
+    async fn main() {
+        let result = DbConnect::execute_mssql_query(
+            "username", 
+            "password", 
+            "server/host", 
+            "database", 
+            "SELECT * FROM your_table").await?;
+
+        let headers = result.0;
+        let row_data = result.1;
+    }
+
+
+3. `csv_utils`
 ------------
 
 The `csv_utils` module encompasses a set of utilities designed to simplify various tasks associated with CSV files. These utilities include the `CsvBuilder` for creating and managing CSV files, the `CsvConverter` for transforming JSON data into CSV format, and the `CsvResultCacher` for efficient data caching and retrieval. Each utility is tailored to enhance productivity and ease in handling CSV data in different scenarios.
@@ -502,7 +529,7 @@ These methods return specific data, instead of a mutable CsvBuilder object, and 
         }
     }
 
-3. ai_utils
+4. `ai_utils`
 -----------
 
 This library provides simple AI utilities for neural association analysis. It focuses on processing and analyzing data within neural networks, with an emphasis on understanding AI decision-making processes and text analysis, optimized for a parallel computing environment.
@@ -534,7 +561,7 @@ Example
         dbg!(fuzzai_result);
     }
 
-4. api_utils
+5. `api_utils`
 ------------
 
 Examples across common API call patterns
@@ -625,14 +652,14 @@ Examples across common API call patterns
         Ok(response)
     }
 
-5. loop_utils
+6. `loop_utils`
 -------------
 
 ### FutureLoop
 
 `FutureLoop` provides a fluent interface to do multiple things at once (asynchronously) when dealing with a list or collection of items. 
 
-The future_for function suits scenarios where you need a moderate level of concurrency. For instance, when each item's processing is relatively straightforward and doesn't require complex shared state or high-throughput parallelism. 
+The `future_for` function suits scenarios where you need a moderate level of concurrency. For instance, when each item's processing is relatively straightforward and doesn't require complex shared state or high-throughput parallelism. 
 
     use rgwml::loop_utils::FutureLoop;
 
@@ -646,7 +673,7 @@ The future_for function suits scenarios where you need a moderate level of concu
         println!("Results: {:?}", results);
     }
 
-6. License
+7. License
 ----------
 
 This project is licensed under the MIT License - see the LICENSE file for details.

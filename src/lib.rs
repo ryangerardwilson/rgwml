@@ -4,6 +4,11 @@
 //! This library simplifies Data Science, Machine Learning, and Artifical Intelligence operations. It's designed to leverage the best features of RUST, in a manner that is graceful, elegant, and ticklishly fun to build upon.
 //!
 //! ## Modules Overview
+//! 
+//! ## `db_utils`
+//!   - **Purpose**: Query various SQL databases with simple elegant syntax.
+//!   - **Features**: This module supports the following database connections:
+//!     - MSSQL Server
 //!
 //! ### `csv_utils`
 //!   - **Purpose**: A Comprehensive Toolkit for CSV File Management, in AI/ML pipelines.
@@ -35,6 +40,27 @@
 //! - **Features**:
 //!   - **FutureLoop**: Handle multiple tasks simultaneously when working with lists or collections, while working with a fluent interface.
 //!
+//! ## db_utils
+//! 
+//! `db_utils` is a set of tools for working with SQL databases, such as Microsoft SQL Server databases. For instance, you can:
+//!
+//! Easily connect and query MSSQL Server
+//!
+//! ```
+//!     use rgwml::db_utils::DbConnect;
+//!
+//!     #[tokio::main]
+//!     async fn main() {
+//!         let result = DbConnect::execute_mssql_query(
+//!             "username",
+//!             "password",
+//!             "server/host",
+//!             "database",
+//!             "SELECT * FROM your_table").await?;
+//!         let headers = result.0;
+//!         let row_data = result.1;
+//!     }
+//! ```
 //! ## csv_utils
 //!
 //! The `csv_utils` module encompasses a set of utilities designed to simplify various tasks associated with CSV files. These utilities include the `CsvBuilder` for creating and managing CSV files, the `CsvConverter` for transforming JSON data into CSV format, and the `CsvResultCacher` for efficient data caching and retrieval. Each utility is tailored to enhance productivity and ease in handling CSV data in different scenarios.
@@ -44,7 +70,7 @@
 //!
 //! Easily print example synatax relating to this feature in your workflow.
 //!
-//!```
+//! ```
 //!     use rgwml::csv_utils::{CsvBuilder, CsvConverter, CsvResultCacher};
 //!     use std::collections::HashMap;
 //!
@@ -67,7 +93,7 @@
 //!- **Parallel Processing**: Leverage parallel computing to efficiently analyze neural associations, gaining insights into AI decision-making processes.
 //!
 //! Example
-//!```
+//! ```
 //!     use rgwml::ai_utils::{fuzzai, SplitUpto, ShowComplications, WordLengthSensitivity};
 //!     use std::error::Error;
 //!     
@@ -132,3 +158,4 @@ pub mod ai_utils;
 pub mod api_utils;
 pub mod csv_utils;
 pub mod loop_utils;
+pub mod db_utils;
