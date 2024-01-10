@@ -1,6 +1,6 @@
 [package]
 name = "rgwml"
-version = "1.1.58"
+version = "1.1.59"
 edition = "2021"
 authors = ["Ryan Gerard Wilson"]
 description = "A crate for reducing cognitive overload while using rust for ml, ai, and data science operations"
@@ -24,4 +24,5 @@ rand = "0.8.5"
 tiberius = "0.12.2"
 tokio-util = { version = "0.7", features = ["compat"] }
 uuid = "1.6.1"
+mysql_async = "0.33.0"
 

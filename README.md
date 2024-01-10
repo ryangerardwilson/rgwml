@@ -11,7 +11,8 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 
 - **Purpose**: Query various SQL databases with simple elegant syntax.
 - **Features**: This module supports the following database connections:
-  - MSSQL Server
+  - MSSQL
+  - MYSQL
 
 ## `csv_utils`
 
@@ -50,13 +51,13 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 2. `db_utils`
 -----------
 
-### MSSQL Server: Connect and query
+Easily query a MSSQL or MYSQL server
 
     use rgwml::db_utils::DbConnect;
 
     #[tokio::main]
     async fn main() {
-        let result = DbConnect::execute_mssql_query(
+        let result = DbConnect::execute_mssql_query( // use `execute_mysql_query` for MYSQL
             "username", 
             "password", 
             "server/host", 
@@ -66,7 +67,6 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
         let headers = result.0;
         let row_data = result.1;
     }
-
 
 3. `csv_utils`
 ------------

@@ -4,7 +4,7 @@ use tiberius::{error::Error, AuthMethod, Client, ColumnType, Config, QueryItem, 
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use uuid::Uuid;
-
+use mysql_async::{prelude::*, Pool, OptsBuilder, Row as MySqlRow};
 
 pub struct DbConnect;
 
@@ -227,8 +227,51 @@ pub async fn execute_mssql_query(
         Ok((headers, data))
     }
 
+    pub async fn execute_mysql_query(
+        username: &str,
+        password: &str,
+        server: &str,
+        database: &str,
+        sql_query: &str,
+    ) -> Result<(Vec<String>, Vec<Vec<String>>), Box<dyn std::error::Error>> {
+        // Create an OptsBuilder instance and set the connection details
+        let builder = OptsBuilder::default()
+            .user(Some(username))
+            .pass(Some(password))
+            .ip_or_hostname(server)
+            .db_name(Some(database));
+
+        // Create a pool with the constructed Opts
+        let pool = Pool::new(builder);
+        let mut conn = pool.get_conn().await?;
+
+        // Perform the query
+        let result: Vec<MySqlRow> = conn.query(sql_query).await?;
+
+        // Process the result
+        let mut headers = Vec::new();
+        let mut data = Vec::new();
+
+        if let Some(first_row) = result.first() {
+            headers = first_row.columns_ref().iter()
+                            .map(|col| col.name_str().to_string())
+                            .collect::<Vec<String>>();
+        }
+
+for row in result {
+    let row_data = (0..headers.len())
+        .map(|i| {
+            match row.get_opt::<String, usize>(i) {
+                Some(Ok(value)) => value,
+                _ => String::from("NULL") // Or any other placeholder you prefer
+            }
+        })
+        .collect::<Vec<String>>();
+    data.push(row_data);
+}
 
 
-
+        Ok((headers, data))
+    }
 
 }

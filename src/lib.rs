@@ -44,14 +44,14 @@
 //! 
 //! `db_utils` is a set of tools for working with SQL databases, such as Microsoft SQL Server databases. For instance, you can:
 //!
-//! Easily connect and query MSSQL Server
+//! Easily connect and query an SQL Server
 //!
 //! ```
 //!     use rgwml::db_utils::DbConnect;
 //!
 //!     #[tokio::main]
 //!     async fn main() {
-//!         let result = DbConnect::execute_mssql_query(
+//!         let result = DbConnect::execute_mssql_query( // use `execute_mysql_query` for MYSQL
 //!             "username",
 //!             "password",
 //!             "server/host",
@@ -61,6 +61,7 @@
 //!         let row_data = result.1;
 //!     }
 //! ```
+//!
 //! ## csv_utils
 //!
 //! The `csv_utils` module encompasses a set of utilities designed to simplify various tasks associated with CSV files. These utilities include the `CsvBuilder` for creating and managing CSV files, the `CsvConverter` for transforming JSON data into CSV format, and the `CsvResultCacher` for efficient data caching and retrieval. Each utility is tailored to enhance productivity and ease in handling CSV data in different scenarios.

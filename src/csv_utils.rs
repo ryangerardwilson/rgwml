@@ -327,6 +327,18 @@ impl CsvBuilder {
         Ok(CsvBuilder::from_raw_data(result.0, result.1))
     }
 
+    /// Creates a `CsvBuilder` instance directly from an MSSQL query.
+    pub async fn from_mysql_query(
+        username: &str,
+        password: &str,
+        server: &str,
+        database: &str,
+        sql_query: &str,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let result = DbConnect::execute_mysql_query(username, password, server, database, sql_query).await?;
+
+        Ok(CsvBuilder::from_raw_data(result.0, result.1))
+    }
 
     /// Calibrates a poorly formatted Csv File
     pub fn calibrate(&mut self, config: CalibConfig) -> &mut Self {
