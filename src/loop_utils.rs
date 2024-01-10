@@ -4,7 +4,6 @@ use std::future::Future;
 pub struct FutureLoop;
 
 impl FutureLoop {
-
     /// Asynchronously processes an iterable, applying a provided future-returning closure to each item and returning their collective results.    
     pub async fn future_for<I, T, F, Fut>(iterable: I, mut f: F) -> Vec<T>
     where

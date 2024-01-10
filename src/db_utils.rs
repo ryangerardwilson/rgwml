@@ -1,63 +1,59 @@
 // db_utils.rs
 use futures::StreamExt;
+use mysql_async::{prelude::*, OptsBuilder, Pool, Row as MySqlRow};
 use tiberius::{error::Error, AuthMethod, Client, ColumnType, Config, QueryItem, Row};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use uuid::Uuid;
-use mysql_async::{prelude::*, Pool, OptsBuilder, Row as MySqlRow};
 
 pub struct DbConnect;
 
 impl DbConnect {
-
-pub async fn execute_mssql_query(
-    username: &str,
-    password: &str,
-    server: &str,
-    database: &str,
-    sql_query: &str,
-) -> Result<(Vec<String>, Vec<Vec<String>>), Box<dyn std::error::Error>> {
-
-    async fn create_mssql_connection(
+    pub async fn execute_mssql_query(
         username: &str,
         password: &str,
         server: &str,
         database: &str,
-    ) -> Result<Client<Compat<TcpStream>>, Box<dyn std::error::Error>> {
-        let mut config = Config::new();
-        config.host(server);
-        config.database(database);
-        config.port(1433);
-        config.authentication(AuthMethod::sql_server(&username, &password));
-        config.trust_cert();
+        sql_query: &str,
+    ) -> Result<(Vec<String>, Vec<Vec<String>>), Box<dyn std::error::Error>> {
+        async fn create_mssql_connection(
+            username: &str,
+            password: &str,
+            server: &str,
+            database: &str,
+        ) -> Result<Client<Compat<TcpStream>>, Box<dyn std::error::Error>> {
+            let mut config = Config::new();
+            config.host(server);
+            config.database(database);
+            config.port(1433);
+            config.authentication(AuthMethod::sql_server(&username, &password));
+            config.trust_cert();
 
-        let tcp = TcpStream::connect(config.get_addr()).await?;
-        tcp.set_nodelay(true)?;
+            let tcp = TcpStream::connect(config.get_addr()).await?;
+            tcp.set_nodelay(true)?;
 
-        let compat_tcp = tcp.compat_write();
+            let compat_tcp = tcp.compat_write();
 
-        let client = match Client::connect(config, compat_tcp).await {
-            Ok(client) => client,
-            Err(Error::Routing { host, port }) => {
-                let mut config = Config::new();
-                config.host(&host);
-                config.port(port);
-                config.authentication(AuthMethod::sql_server(username, password));
+            let client = match Client::connect(config, compat_tcp).await {
+                Ok(client) => client,
+                Err(Error::Routing { host, port }) => {
+                    let mut config = Config::new();
+                    config.host(&host);
+                    config.port(port);
+                    config.authentication(AuthMethod::sql_server(username, password));
 
-                let tcp = TcpStream::connect(config.get_addr()).await?;
-                tcp.set_nodelay(true)?;
+                    let tcp = TcpStream::connect(config.get_addr()).await?;
+                    tcp.set_nodelay(true)?;
 
-                let compat_tcp = tcp.compat_write();
+                    let compat_tcp = tcp.compat_write();
 
-                Client::connect(config, compat_tcp).await?
-            }
-            Err(e) => return Err(e.into()),
-        };
+                    Client::connect(config, compat_tcp).await?
+                }
+                Err(e) => return Err(e.into()),
+            };
 
-        Ok(client)
-    }
-
-
+            Ok(client)
+        }
 
         fn extract_column_names(row: &Row) -> Vec<String> {
             row.columns()
@@ -253,25 +249,25 @@ pub async fn execute_mssql_query(
         let mut data = Vec::new();
 
         if let Some(first_row) = result.first() {
-            headers = first_row.columns_ref().iter()
-                            .map(|col| col.name_str().to_string())
-                            .collect::<Vec<String>>();
+            headers = first_row
+                .columns_ref()
+                .iter()
+                .map(|col| col.name_str().to_string())
+                .collect::<Vec<String>>();
         }
 
-for row in result {
-    let row_data = (0..headers.len())
-        .map(|i| {
-            match row.get_opt::<String, usize>(i) {
-                Some(Ok(value)) => value,
-                _ => String::from("NULL") // Or any other placeholder you prefer
-            }
-        })
-        .collect::<Vec<String>>();
-    data.push(row_data);
-}
-
+        for row in result {
+            let row_data = (0..headers.len())
+                .map(|i| {
+                    match row.get_opt::<String, usize>(i) {
+                        Some(Ok(value)) => value,
+                        _ => String::from("NULL"), // Or any other placeholder you prefer
+                    }
+                })
+                .collect::<Vec<String>>();
+            data.push(row_data);
+        }
 
         Ok((headers, data))
     }
-
 }

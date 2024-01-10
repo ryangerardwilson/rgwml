@@ -313,7 +313,6 @@ impl CsvBuilder {
         }
     }
 
-
     /// Creates a `CsvBuilder` instance directly from an MSSQL query.
     pub async fn from_mssql_query(
         username: &str,
@@ -322,7 +321,8 @@ impl CsvBuilder {
         database: &str,
         sql_query: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let result = DbConnect::execute_mssql_query(username, password, server, database, sql_query).await?;
+        let result =
+            DbConnect::execute_mssql_query(username, password, server, database, sql_query).await?;
 
         Ok(CsvBuilder::from_raw_data(result.0, result.1))
     }
@@ -335,7 +335,8 @@ impl CsvBuilder {
         database: &str,
         sql_query: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let result = DbConnect::execute_mysql_query(username, password, server, database, sql_query).await?;
+        let result =
+            DbConnect::execute_mysql_query(username, password, server, database, sql_query).await?;
 
         Ok(CsvBuilder::from_raw_data(result.0, result.1))
     }
@@ -715,40 +716,6 @@ impl CsvBuilder {
         }
         self
     }
-
-    /*
-    /// Prints an abbreviated table of the CSV data.
-    pub fn print_table(&mut self) -> &mut Self {
-        // Define the number of rows to show at the start and end
-        let show_rows = 5;
-
-        let total_rows = self.data.len();
-        let total_cols = self.headers.len();
-
-        // Print the headers
-        println!("\n{}", self.headers.join(", "));
-
-        // Print top rows
-        for row in self.data.iter().take(show_rows) {
-            println!("{}", row.join(", "));
-        }
-
-        // Print ellipsis if the table is long
-        if total_rows > 2 * show_rows {
-            println!("... ({} rows omitted) ...", total_rows - 2 * show_rows);
-        }
-
-        // Print bottom rows
-        for row in self.data.iter().rev().take(show_rows).rev() {
-            println!("{}", row.join(", "));
-        }
-
-        // For wide tables, you might want to truncate or wrap columns.
-        // This part is left as an exercise.
-
-        self
-    }
-    */
 
     /// Prints an abbreviated table of the CSV data with lines and consistent spacing for cells.
     pub fn print_table(&mut self) -> &mut Self {
