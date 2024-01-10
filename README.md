@@ -155,6 +155,17 @@ Example 4: Load from raw data
 
     let builder = CsvBuilder::from_raw_data(headers, data);
 
+Example 5: Load from an MSSQL Server query
+
+    use rgwml::csv_utils::CsvBuilder;
+
+    CsvBuilder::from_mssql_query(
+        "username", 
+        "password", 
+        "server", 
+        "database", 
+        "SELECT * from your_table").await;
+
 ####  Manipulating a CsvBuilder Object for Analysis or Saving
 
     use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
