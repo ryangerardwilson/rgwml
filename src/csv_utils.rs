@@ -717,70 +717,150 @@ impl CsvBuilder {
         self
     }
 
+    
     /// Prints an abbreviated table of the CSV data with lines and consistent spacing for cells.
-    pub fn print_table(&mut self) -> &mut Self {
-        let show_rows = 5; // Number of rows to show at the start and end
 
-        let total_rows = self.data.len();
 
-        // Function to truncate and pad string to 10 characters
-        let format_cell = |s: &String| -> String { format!("{:10.10}", s.as_str()) };
+pub fn print_table(&mut self) -> &mut Self {
+    let show_rows = 5; // Number of rows to show at the start and end
+    let total_rows = self.data.len();
+    let max_row_width = 120;
+    let max_cell_width: usize = 15; // Explicitly specify the type here
+    let min_cell_width = 10;
 
-        // Calculate total table width
-        let table_width = self.headers.len() * 12 + 1;
+    // Calculate maximum length for each column
+    let mut max_lengths = vec![0; self.headers.len()];
+    for row in &self.data {
+        for (i, cell) in row.iter().enumerate() {
+            max_lengths[i] = std::cmp::max(max_lengths[i], cell.len());
+        }
+    }
 
-        // Print the headers
+    // Calculate total max length
+    let total_max_length: usize = max_lengths.iter().sum();
+
+    // Calculate surplus width and distribute it
+    if total_max_length < max_row_width {
+        let surplus = max_row_width - total_max_length;
+        let total_truncation: usize = max_lengths.iter().map(|len| max_cell_width.saturating_sub(*len)).sum();
+
+        if total_truncation > 0 {
+            for length in max_lengths.iter_mut() {
+                let truncation = max_cell_width.saturating_sub(*length);
+                let proportion = truncation as f32 / total_truncation as f32;
+                *length += (surplus as f32 * proportion).round() as usize;
+            }
+        }
+    }
+
+    // Ensure lengths are not less than min_cell_width
+    for length in max_lengths.iter_mut() {
+        *length = std::cmp::max(*length, min_cell_width);
+    }
+
+    // Function to truncate and pad string based on column max length
+    let format_cell = |s: &String, max_length: usize| -> String {
+        format!("{:width$.width$}", s, width = max_length)
+    };
+
+
+    // Determine headers to print and omitted columns
+    let (headers_to_print, omitted_columns) = if self.headers.len() > 7 {
+        let omitted_count = self.headers.len() - 7;
+        let column_word = if omitted_count == 1 { "col" } else { "cols" };
+        let ellipsis_text = format!("  <<+{} {}>>  ", omitted_count, column_word);
+        let combined_headers = [&self.headers[..4], &vec![ellipsis_text], &self.headers[self.headers.len() - 3..]].concat();
+        (combined_headers, &self.headers[4..self.headers.len() - 3])
+    } else {
+        (self.headers.clone(), &[] as &[String])
+    };
+
+    // Adjust max_lengths array according to headers_to_print
+    let adjusted_max_lengths = if self.headers.len() > 7 {
+        let mut lengths = max_lengths[..4].to_vec();
+        lengths.push(15); // Assigning an appropriate length for the ellipsis placeholder
+        lengths.extend_from_slice(&max_lengths[max_lengths.len() - 3..]);
+        lengths
+    } else {
+        max_lengths
+    };
+
+    // Calculate total table width
+    let table_width = adjusted_max_lengths.iter().map(|&len| std::cmp::max(10, std::cmp::min(len + 1, max_cell_width)) + 1).sum::<usize>() + 1;
+
+    // Print the headers
+    println!(
+        "\n|{}|",
+        headers_to_print
+            .iter()
+            .zip(adjusted_max_lengths.iter())
+            .map(|(header, &max_length)| format_cell(header, max_length))
+            .collect::<Vec<String>>()
+            .join("|")
+    );
+    println!("{}", "-".repeat(table_width));
+
+    // Print function for rows
+    let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>| {
+        let row_to_print = if row.len() > 7 {
+            let mut cells = row[..4].to_vec();
+            cells.push("...".to_string()); // Inserting ellipsis in the row
+            cells.extend_from_slice(&row[row.len() - 3..]);
+            cells
+        } else {
+            row.clone()
+        };
+
         println!(
-            "\n|{}|",
-            self.headers
+            "|{}|",
+            row_to_print
                 .iter()
-                .map(&format_cell)
+                .zip(max_lengths.iter())
+                .map(|(cell, &max_length)| format_cell(cell, max_length))
                 .collect::<Vec<String>>()
                 .join("|")
         );
-        println!("{}", "-".repeat(table_width));
+    };
 
-        // Print function for rows
-        let print_row = |row: &Vec<String>| {
-            println!(
-                "|{}|",
-                row.iter()
-                    .map(&format_cell)
-                    .collect::<Vec<String>>()
-                    .join("|")
-            );
-        };
-
-        //dbg!(&self.data.iter(), &self.headers.iter());
-
-        // Print the first `show_rows`
-        for row in self.data.iter().take(show_rows) {
-            print_row(row);
-        }
-
-        // Check if ellipsis and bottom rows are needed
-        if total_rows > 2 * show_rows {
-            // Print ellipsis
-            println!("... ({} rows omitted) ...", total_rows - 2 * show_rows);
-
-            // Print the last `show_rows`
-            for row in self.data.iter().skip(total_rows - show_rows) {
-                print_row(row);
-            }
-        } else if total_rows > show_rows {
-            // Print the remaining rows if total is greater than show_rows
-            for row in self
-                .data
-                .iter()
-                .skip(show_rows)
-                .take(total_rows - show_rows)
-            {
-                print_row(row);
-            }
-        }
-
-        self
+    // Print the first `show_rows`
+    for row in self.data.iter().take(show_rows) {
+        print_row(row, &adjusted_max_lengths);
     }
+
+    // Check if ellipsis and bottom rows are needed for data
+    if total_rows > 2 * show_rows {
+
+    let omitted_row_count = total_rows - 2 * show_rows;
+    let row_word = if omitted_row_count == 1 { "row" } else { "rows" };
+
+    println!("<<+{} {}>>", omitted_row_count, row_word);
+        for row in self.data.iter().skip(total_rows - show_rows) {
+            print_row(row, &adjusted_max_lengths);
+        }
+    } else if total_rows > show_rows {
+        for row in self
+            .data
+            .iter()
+            .skip(show_rows)
+            .take(total_rows - show_rows)
+        {
+            print_row(row, &adjusted_max_lengths);
+        }
+    }
+
+    if !omitted_columns.is_empty() {
+        let omitted_column_names = omitted_columns.join(", ");
+        println!("\nOmitted columns: {}", omitted_column_names);
+    }
+
+    // Print total number of rows
+    println!("Total rows: {}", total_rows);
+
+    self
+
+}
+
+
 
     /// Aesthetically prints the frequency of all unique values in the indicated columns, sorted by frequency.
     pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
