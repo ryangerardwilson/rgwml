@@ -1,4 +1,5 @@
 // db_utils.rs
+use chrono::NaiveDateTime;
 use futures::StreamExt;
 use mysql_async::{prelude::*, OptsBuilder, Pool, Row as MySqlRow};
 use tiberius::{error::Error, AuthMethod, Client, ColumnType, Config, QueryItem, Row};
@@ -130,32 +131,21 @@ impl DbConnect {
                     | ColumnType::NVarchar
                     | ColumnType::NChar
                     | ColumnType::Text
-                    | ColumnType::NText => row
-                        .try_get::<&str, _>(i)
-                        //            .map_or_else(|_| "".to_string(), |v| v.to_string()),
-                        .map_or_else(
-                            |_| "".to_string(),
-                            |v| match v {
-                                Some(value) => value.to_string(),
-                                None => "".to_string(),
-                            },
-                        ),
-
-                    ColumnType::Datetime
-                    | ColumnType::Datetime2
-                    | ColumnType::Datetime4
-                    | ColumnType::Daten
-                    | ColumnType::Timen
-                    | ColumnType::DatetimeOffsetn => row.try_get::<&str, _>(i).map_or_else(
+                    | ColumnType::NText => row.try_get::<&str, _>(i).map_or_else(
                         |_| "".to_string(),
                         |v| match v {
-                            Some(date_str) => {
-                                chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%d %H:%M:%S")
-                                    .map_or_else(|_| "".to_string(), |dt| dt.to_string())
-                            }
+                            Some(value) => value.to_string(),
                             None => "".to_string(),
                         },
                     ),
+
+                    ColumnType::Datetime => {
+                        match row.try_get::<NaiveDateTime, _>(i) {
+                            Ok(Some(naive_datetime)) => naive_datetime.to_string(), // Format this appropriately
+                            Ok(None) => "".to_string(),
+                            Err(_) => "Error or non-Datetime value".to_string(),
+                        }
+                    }
 
                     ColumnType::Money | ColumnType::Money4 => row.try_get::<f64, _>(i).map_or_else(
                         |_| "".to_string(),
