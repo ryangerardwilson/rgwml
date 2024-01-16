@@ -524,6 +524,20 @@ impl CsvBuilder {
         self
     }
 
+    /// Deletes a data row at a specified index in the CSV.
+    pub fn delete_row_by_row_number(&mut self, index: usize) -> bool {
+        // Adjust for 1-based indexing
+        let zero_based_index = index.saturating_sub(1);
+
+        // Check if the 0-based index is within the range of data
+        if zero_based_index < self.data.len() {
+            self.data.remove(zero_based_index);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Adds column header
     pub fn add_column_header(&mut self, column_name: &str) -> &mut Self {
         if self.error.is_none() {
