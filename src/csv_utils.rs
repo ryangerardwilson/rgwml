@@ -513,7 +513,7 @@ impl CsvBuilder {
             let row_vec = new_row.into_iter().map(|s| s.to_string()).collect();
             self.data[zero_based_index] = row_vec;
         } else {
-            dbg!(&index, &new_row);
+            //dbg!(&index, &new_row);
             // Set error if the index is out of range
             self.error = Some(Box::new(std::io::Error::new(
                 ErrorKind::InvalidInput,
