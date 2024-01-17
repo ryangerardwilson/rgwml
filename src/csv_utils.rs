@@ -64,13 +64,13 @@ pub struct Train<'a> {
     pub output: &'a str,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExpVal<'a> {
     STR(&'a str),
     VEC(Vec<&'a str>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Exp<'a> {
     pub column: &'a str,
     pub operator: &'a str,
@@ -137,7 +137,13 @@ impl CompareValue for &str {
                         "==" => row_date == compare_date,
                         ">" => row_date > compare_date,
                         "<" => row_date < compare_date,
-                        _ => false,
+                        ">=" => row_date >= compare_date,
+                        "<=" => row_date <= compare_date,
+                        "!=" => row_date != compare_date,
+                        _ => {
+                            println!("Unexpected operation: '{}'", operation);
+                            false
+                        }
                     },
                     _ => {
                         println!("Error comparing timestamps. Unable to parse '{}' or '{}' as timestamps.", cell_value, self);
@@ -145,6 +151,7 @@ impl CompareValue for &str {
                     }
                 }
             }
+
             _ => false,
         }
     }
@@ -926,6 +933,7 @@ impl CsvBuilder {
         self
     }
 
+    /// Same as print_freq with the additional ability to cluster data
     pub fn print_freq_mapped(
         &mut self,
         columns_with_groupings: Vec<(&str, Vec<(&str, Vec<&str>)>)>,
