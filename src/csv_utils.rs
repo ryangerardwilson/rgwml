@@ -735,6 +735,55 @@ impl CsvBuilder {
         self
     }
 
+/// Prints rows matching the filter criteria and returns a new instance for chaining.
+pub fn print_rows_where(
+    &self, // Immutable reference to retain the original state
+    expressions: Vec<(&str, Exp)>,
+    result_expression: &str,
+) -> &Self { // Returns a new instance
+    //let mut new_self = self.clone(); // Assuming your struct is Cloneable
+
+    // Use the headers directly since we are not modifying data
+    let headers = &self.headers;
+
+    for row in self.data.iter() {
+        let mut expr_results = HashMap::new();
+        expr_results.insert("true", true);
+        expr_results.insert("false", false);
+
+        // Evaluate each expression
+        for (expr_name, exp) in &expressions {
+            if let Some(column_index) = headers.iter().position(|h| h == exp.column) {
+                if let Some(cell_value) = row.get(column_index) {
+                    let result = match &exp.compare_with {
+                        ExpVal::STR(value_str) => {
+                            value_str.apply(cell_value, exp.operator, exp.compare_as)
+                        }
+                        ExpVal::VEC(values) => {
+                            values.apply(cell_value, exp.operator, exp.compare_as)
+                        }
+                    };
+                    expr_results.insert(*expr_name, result);
+                } else {
+                    expr_results.insert(*expr_name, false);
+                }
+            } else {
+                println!("Column '{}' not found in headers.", exp.column);
+                expr_results.insert(*expr_name, false);
+            }
+        }
+
+        // Evaluate the final result expression
+        if self.evaluate_result_expression(&expr_results, result_expression) {
+            // Print the row if the result expression evaluates to true
+            self.print_row_json(row);
+        }
+    }
+
+    self // Return the new instance
+}
+
+
     /// Prints specified cells for each row of the CSV data.
     pub fn print_cells(&mut self, columns: Vec<&str>) -> &mut Self {
         println!();

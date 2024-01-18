@@ -330,6 +330,11 @@ Example 5: Load from an MSSQL Server query
     .print_last_row()
     .print_rows_range(2,5) // Shows results per a spreadsheet row range
     .print_rows() // Shows results as per a spreadsheet row range
+    .print_rows_where(
+        vec![
+            // Same as .where()
+        ],
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
     .print_table() // Prints a truncated table to the terminal
     .print_cells(vec!["Column1", "Column2"])
     .print_unique("column_name")
