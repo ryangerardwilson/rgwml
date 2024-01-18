@@ -86,6 +86,7 @@ pub trait CompareValue {
 /// Implements CompareValue for a single string reference
 impl CompareValue for &str {
     fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool {
+        //dbg!(&self, &cell_value, &operation, &compare_as);
         // Simplified example, implement the logic as per your requirement
         match compare_as {
             "TEXT" => match operation {
@@ -160,7 +161,9 @@ impl CompareValue for &str {
 /// Implements CompareValue for a Vec<&str> reference
 impl CompareValue for Vec<&str> {
     fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool {
-        if operation.starts_with("FUZZ_MIN_SCORE_") && compare_as == "COMPARE_AS_TEXT" {
+        //dbg!(&self, &cell_value, &operation, &compare_as);
+
+        if operation.starts_with("FUZZ_MIN_SCORE_") && compare_as == "TEXT" {
             // Extract the score threshold from the operation string
             let score_threshold: i32 = operation["FUZZ_MIN_SCORE_".len()..].parse().unwrap_or(70);
 
@@ -197,6 +200,7 @@ impl CompareValue for Vec<&str> {
             }
 
             let max_score = *all_scores.iter().max().unwrap_or(&0);
+            //dbg!(&max_score);
             i32::from(max_score) >= score_threshold
         } else {
             false
@@ -735,54 +739,58 @@ impl CsvBuilder {
         self
     }
 
-/// Prints rows matching the filter criteria and returns a new instance for chaining.
-pub fn print_rows_where(
-    &self, // Immutable reference to retain the original state
-    expressions: Vec<(&str, Exp)>,
-    result_expression: &str,
-) -> &Self { // Returns a new instance
-    //let mut new_self = self.clone(); // Assuming your struct is Cloneable
+    /// Prints rows matching the filter criteria and returns a new instance for chaining.
+    pub fn print_rows_where(
+        &self, // Immutable reference to retain the original state
+        expressions: Vec<(&str, Exp)>,
+        result_expression: &str,
+    ) -> &Self {
+        // Use the headers directly since we are not modifying data
+        let headers = &self.headers;
 
-    // Use the headers directly since we are not modifying data
-    let headers = &self.headers;
+        let mut row_number = 0; // Variable to keep track of the row number
+        let mut printed_row_count = 0; // Variable to count the number of printed rows
 
-    for row in self.data.iter() {
-        let mut expr_results = HashMap::new();
-        expr_results.insert("true", true);
-        expr_results.insert("false", false);
+        for row in self.data.iter() {
+            row_number += 1; // Increment the row number for each row
+            let mut expr_results = HashMap::new();
+            expr_results.insert("true", true);
+            expr_results.insert("false", false);
 
-        // Evaluate each expression
-        for (expr_name, exp) in &expressions {
-            if let Some(column_index) = headers.iter().position(|h| h == exp.column) {
-                if let Some(cell_value) = row.get(column_index) {
-                    let result = match &exp.compare_with {
-                        ExpVal::STR(value_str) => {
-                            value_str.apply(cell_value, exp.operator, exp.compare_as)
-                        }
-                        ExpVal::VEC(values) => {
-                            values.apply(cell_value, exp.operator, exp.compare_as)
-                        }
-                    };
-                    expr_results.insert(*expr_name, result);
+            // Evaluate each expression
+            for (expr_name, exp) in &expressions {
+                if let Some(column_index) = headers.iter().position(|h| h == exp.column) {
+                    if let Some(cell_value) = row.get(column_index) {
+                        let result = match &exp.compare_with {
+                            ExpVal::STR(value_str) => {
+                                value_str.apply(cell_value, exp.operator, exp.compare_as)
+                            }
+                            ExpVal::VEC(values) => {
+                                values.apply(cell_value, exp.operator, exp.compare_as)
+                            }
+                        };
+                        expr_results.insert(*expr_name, result);
+                    } else {
+                        expr_results.insert(*expr_name, false);
+                    }
                 } else {
+                    println!("Column '{}' not found in headers.", exp.column);
                     expr_results.insert(*expr_name, false);
                 }
-            } else {
-                println!("Column '{}' not found in headers.", exp.column);
-                expr_results.insert(*expr_name, false);
+            }
+
+            // Evaluate the final result expression
+            if self.evaluate_result_expression(&expr_results, result_expression) {
+                println!("Row number: {}", row_number); // Print the row number
+                self.print_row_json(row); // Print the row if the result expression evaluates to true
+                printed_row_count += 1; // Increment the count of printed rows
             }
         }
 
-        // Evaluate the final result expression
-        if self.evaluate_result_expression(&expr_results, result_expression) {
-            // Print the row if the result expression evaluates to true
-            self.print_row_json(row);
-        }
+        println!("Total rows printed: {}", printed_row_count); // Print the total count of rows printed at the end
+
+        self // Return the new instance
     }
-
-    self // Return the new instance
-}
-
 
     /// Prints specified cells for each row of the CSV data.
     pub fn print_cells(&mut self, columns: Vec<&str>) -> &mut Self {
