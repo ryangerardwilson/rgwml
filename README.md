@@ -236,8 +236,9 @@ Example 5: Load from an MSSQL Server query
     .add_row(vec!["Row1-1", "Row1-2", "Row1-3"])
     .add_rows(vec![vec!["Row1-1", "Row1-2", "Row1-3"], vec!["Row2-1", "Row2-2", "Row2-3"]])
     .update_row_by_row_number(2, vec!["Bob", "36", "San Francisco"])
+    .update_row_by_id(2, vec!["Bob", "36", "San Francisco"]) // Updates a row by id in the CSV, assuming the first column is 'id'
     .delete_row_by_row_number(2)
-
+    .delete_row_by_id(2) // Deletes a row by id in the CSV, assuming the first column is 'id'
     .remove_duplicates()
     
     // F. Cleaning/ Replacing Cell values

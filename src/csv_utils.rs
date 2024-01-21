@@ -21,6 +21,8 @@ use std::io::Error as IoError;
 use std::io::ErrorKind;
 use std::pin::Pin;
 use std::time::{Duration, SystemTime};
+//use std::error::Error as StdError;
+//use std::io::{self, Error as IoError, ErrorKind};
 
 /// A utility struct for converting JSON data to CSV format.
 pub struct CsvConverter;
@@ -535,6 +537,18 @@ impl CsvBuilder {
         self
     }
 
+    /// Updates a data row by ID in the CSV, assuming the first column is 'id'.
+    pub fn update_row_by_id(&mut self, index: usize, new_row: Vec<&str>) {
+        let zero_based_index = index.saturating_sub(1);
+
+        if zero_based_index < self.data.len() {
+            // Update the row if the index is valid
+            self.data[zero_based_index] = new_row.into_iter().map(|s| s.to_string()).collect();
+        } else {
+            eprintln!("Row index out of range. Cannot update row.");
+        }
+    }
+
     /// Deletes a data row at a specified index in the CSV.
     pub fn delete_row_by_row_number(&mut self, index: usize) -> bool {
         // Adjust for 1-based indexing
@@ -543,6 +557,17 @@ impl CsvBuilder {
         // Check if the 0-based index is within the range of data
         if zero_based_index < self.data.len() {
             self.data.remove(zero_based_index);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Deletes a data row by ID in the CSV, assuming the first column is 'id'.
+    pub fn delete_row_by_id(&mut self, id: &str) -> bool {
+        // Find the index of the row with the given id
+        if let Some((index, _)) = self.data.iter().enumerate().find(|(_, row)| row.first().map_or(false, |first| first == id)) {
+            self.data.remove(index);
             true
         } else {
             false
