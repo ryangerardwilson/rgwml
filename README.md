@@ -337,6 +337,7 @@ Example 5: Load from an MSSQL Server query
         ],
         "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
     .print_table() // Prints a truncated table to the terminal
+    .print_table_all_rows() // Prints a truncated table to the terminal, with all rows
     .print_cells(vec!["Column1", "Column2"])
     .print_unique("column_name")
     .print_freq(vec!["Column1", "Column2"])

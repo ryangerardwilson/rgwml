@@ -566,7 +566,12 @@ impl CsvBuilder {
     /// Deletes a data row by ID in the CSV, assuming the first column is 'id'.
     pub fn delete_row_by_id(&mut self, id: &str) -> bool {
         // Find the index of the row with the given id
-        if let Some((index, _)) = self.data.iter().enumerate().find(|(_, row)| row.first().map_or(false, |first| first == id)) {
+        if let Some((index, _)) = self
+            .data
+            .iter()
+            .enumerate()
+            .find(|(_, row)| row.first().map_or(false, |first| first == id))
+        {
             self.data.remove(index);
             true
         } else {
@@ -970,6 +975,97 @@ impl CsvBuilder {
         if !omitted_columns.is_empty() {
             let omitted_column_names = omitted_columns.join(", ");
             println!("\nOmitted columns: {}", omitted_column_names);
+        }
+
+        // Print total number of rows
+        println!("Total rows: {}", total_rows);
+
+        self
+    }
+
+    /// Prints the full table of the CSV data with lines and consistent spacing for cells.
+    pub fn print_table_all_rows(&mut self) -> &mut Self {
+        let total_rows = self.data.len();
+        let max_cell_width: usize = 45; // Max width for any cell
+
+        // Calculate the maximum length for each column based on all rows
+        let mut max_lengths = self
+            .headers
+            .iter()
+            .map(|h| h.len() + 1)
+            .collect::<Vec<usize>>();
+        for row in self.data.iter() {
+            for (i, cell) in row.iter().enumerate() {
+                let current_max = std::cmp::max(max_lengths[i], cell.len());
+                max_lengths[i] = std::cmp::min(current_max, max_cell_width);
+            }
+        }
+
+        // Function to truncate and pad string based on column max length
+        let format_cell = |s: &String, max_length: usize| -> String {
+            format!("{:width$.width$}", s, width = max_length)
+        };
+
+        // Determine headers to print and omitted columns
+        let headers_to_print = if self.headers.len() > 7 {
+            let omitted_count = self.headers.len() - 7;
+            let column_word = if omitted_count == 1 { "col" } else { "cols" };
+            let ellipsis_text = format!("  <<+{} {}>> ", omitted_count, column_word);
+            let combined_headers = [
+                &self.headers[..4],
+                &vec![ellipsis_text],
+                &self.headers[self.headers.len() - 3..],
+            ]
+            .concat();
+            combined_headers
+        } else {
+            self.headers.clone()
+        };
+
+        // Adjust max_lengths array according to headers_to_print
+        let adjusted_max_lengths = if self.headers.len() > 7 {
+            let mut lengths = max_lengths[..4].to_vec();
+            lengths.push(15); // Assigning an appropriate length for the ellipsis placeholder
+            lengths.extend_from_slice(&max_lengths[max_lengths.len() - 3..]);
+            lengths
+        } else {
+            max_lengths
+        };
+
+        // Calculate total table width
+        let table_width = adjusted_max_lengths
+            .iter()
+            .map(|&len| len + 1)
+            .sum::<usize>()
+            + 1;
+
+        // Print the headers
+        println!(
+            "\n|{}|",
+            headers_to_print
+                .iter()
+                .zip(adjusted_max_lengths.iter())
+                .map(|(header, &max_length)| format_cell(header, max_length))
+                .collect::<Vec<String>>()
+                .join("|")
+        );
+        println!("{}", "-".repeat(table_width));
+
+        // Print function for rows
+        let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>| {
+            println!(
+                "|{}|",
+                row.iter()
+                    .zip(max_lengths.iter())
+                    .map(|(cell, &max_length)| format_cell(cell, max_length))
+                    .collect::<Vec<String>>()
+                    .join("|")
+            );
+        };
+
+        // Print all rows
+        for row in self.data.iter() {
+            print_row(row, &adjusted_max_lengths);
         }
 
         // Print total number of rows
