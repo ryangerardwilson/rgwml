@@ -227,6 +227,7 @@ pub struct CalibConfig {
 /// This struct allows for a fluent interface to build and write to a CSV file,
 /// supporting method chaining. It uses a generic writer to handle different types
 /// of outputs, primarily working with file-based writing.
+#[derive(Debug)] 
 pub struct CsvBuilder {
     headers: Vec<String>,
     data: Vec<Vec<String>>,
