@@ -179,25 +179,25 @@ Example 5: Load from an MSSQL Server query
                 ("Exp1", Exp {
                     column: "customer_type",
                     operator: "==",
-                    compare_with: ExpVal::STR("REGULAR"),
+                    compare_with: ExpVal::STR("REGULAR".to_string()),
                     compare_as: "TEXT" // Also: "NUMBERS", "TIMESTAMPS"
                 }),
                 ("Exp2", Exp {
                     column: "invoice_data",
                     operator: ">",
-                    compare_with: ExpVal::STR("2023-12-31 23:59:59"),
+                    compare_with: ExpVal::STR("2023-12-31 23:59:59".to_string()),
                     compare_as: "TEXT"
                 }),
                 ("Exp3", Exp {
                     column: "invoice_amount",
                     operator: "<",
-                    compare_with: ExpVal::STR("1000"),
+                    compare_with: ExpVal::STR("1000".to_string()),
                     compare_as: "NUMBERS"
                 }),
                 ("Exp4", Exp {
                     column: "address",
                     operator: "FUZZ_MIN_SCORE_60",
-                    compare_with: ExpVal::VEC(vec!["public school"]),
+                    compare_with: ExpVal::VEC(vec!["public school".to_string()]),
                     compare_as: "TEXT"
                 })
             ],
@@ -254,13 +254,13 @@ Example 5: Load from an MSSQL Server query
             ("Exp1", Exp {
                 column: "Withdrawal Amt.",
                 operator: "<",
-                compare_with: ExpVal::STR("1000"),
+                compare_with: ExpVal::STR("1000".to_string()),
                 compare_as: "NUMBERS" // Also: "TEXT", "TIMESTAMPS"
             }),
             ("Exp2", Exp {
                 column: "Withdrawal Type",
                 operator: "==",
-                compare_with: ExpVal::STR("Urgent"),
+                compare_with: ExpVal::STR("Urgent".to_string()),
                 compare_as: "TEXT"
             }),
         ],
@@ -275,43 +275,43 @@ Example 5: Load from an MSSQL Server query
             ("Exp1", Exp {
                 column: "customer_type",
                 operator: "==",
-                compare_with: ExpVal::STR("REGULAR"),
+                compare_with: ExpVal::STR("REGULAR".to_string()),
                 compare_as: "TEXT" // Also: "NUMBERS", "TIMESTAMPS"
             }),
             ("Exp2", Exp {
                 column: "invoice_data",
                 operator: ">",
-                compare_with: ExpVal::STR("2023-12-31 23:59:59"),
+                compare_with: ExpVal::STR("2023-12-31 23:59:59".to_string()),
                 compare_as: "TEXT"
             }),
             ("Exp3", Exp {
                 column: "invoice_amount",
                 operator: "<",
-                compare_with: ExpVal::STR("1000"),
+                compare_with: ExpVal::STR("1000".to_string()),
                 compare_as: "NUMBERS"
             }),
             ("Exp4", Exp {
                 column: "address",
                 operator: "FUZZ_MIN_SCORE_60",
-                compare_with: ExpVal::VEC(vec!["public school"]),
+                compare_with: ExpVal::VEC(vec!["public school".to_string()]),
                 compare_as: "TEXT"
             }),
             ("Exp5", Exp {
                 column: "status",
                 operator: "CONTAINS",
-                compare_with: ExpVal::STR("REJECTED"),
+                compare_with: ExpVal::STR("REJECTED".to_string()),
                 compare_as: "TEXT"
             }),
             ("Exp6", Exp {
                 column: "status",
                 operator: "DOES_NOT_CONTAIN",
-                compare_with: ExpVal::STR("HAS NOT PAID"),
+                compare_with: ExpVal::STR("HAS NOT PAID".to_string()),
                 compare_as: "TEXT"
             }),
             ("Exp7", Exp {
                 column: "status",
                 operator: "STARTS_WITH",
-                compare_with: ExpVal::STR("VERIFIED"),
+                compare_with: ExpVal::STR("VERIFIED".to_string()),
                 compare_as: "TEXT"
             }),
         ],
@@ -388,7 +388,7 @@ Example 5: Load from an MSSQL Server query
                     ("Exp1", Exp {
                         column: "Withdrawal Amt.",
                         operator: "<",
-                        compare_with: ExpVal::STR("1000"),
+                        compare_with: ExpVal::STR("1000".to_string()),
                         compare_as: "NUMBERS" // Also: "TEXT", "TIMESTAMPS"
                     }),
                 ],
@@ -400,13 +400,13 @@ Example 5: Load from an MSSQL Server query
                     ("Exp1", Exp {
                         column: "Withdrawal Amt.",
                         operator: ">=",
-                        compare_with: ExpVal::STR("1000"),
+                        compare_with: ExpVal::STR("1000".to_string()),
                         compare_as: "NUMBERS"
                     }),
                     ("Exp2", Exp {
                         column: "Withdrawal Amt.",
                         operator: "<",
-                        compare_with: ExpVal::STR("5000"),
+                        compare_with: ExpVal::STR("5000".to_string()),
                         compare_as: "NUMBERS"
                     }),
                 ],
@@ -451,7 +451,7 @@ Example 5: Load from an MSSQL Server query
             ("Exp1", Exp {
                 column: "Deposit Amt.",
                 operator: ">",
-                compare_with: ExpVal::STR("500"),
+                compare_with: ExpVal::STR("500".to_string()),
                 compare_as: "NUMBERS" // Also: "TEXT", "TIMESTAMPS"
             }),
         ],

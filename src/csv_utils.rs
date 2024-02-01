@@ -21,8 +21,6 @@ use std::io::Error as IoError;
 use std::io::ErrorKind;
 use std::pin::Pin;
 use std::time::{Duration, SystemTime};
-//use std::error::Error as StdError;
-//use std::io::{self, Error as IoError, ErrorKind};
 
 /// A utility struct for converting JSON data to CSV format.
 pub struct CsvConverter;
@@ -67,17 +65,17 @@ pub struct Train<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub enum ExpVal<'a> {
-    STR(&'a str),
-    VEC(Vec<&'a str>),
+pub struct Exp {
+    pub column: String,
+    pub operator: String,
+    pub compare_with: ExpVal,
+    pub compare_as: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct Exp<'a> {
-    pub column: &'a str,
-    pub operator: &'a str,
-    pub compare_with: ExpVal<'a>,
-    pub compare_as: &'a str,
+pub enum ExpVal {
+    STR(String),
+    VEC(Vec<String>),
 }
 
 /// Defines the trait for comparison values
@@ -86,17 +84,15 @@ pub trait CompareValue {
 }
 
 /// Implements CompareValue for a single string reference
-impl CompareValue for &str {
+impl CompareValue for String {
     fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool {
-        //dbg!(&self, &cell_value, &operation, &compare_as);
-        // Simplified example, implement the logic as per your requirement
         match compare_as {
             "TEXT" => match operation {
                 "==" => cell_value == *self,
                 "!=" => cell_value != *self,
-                "CONTAINS" => cell_value.contains(*self),
-                "STARTS_WITH" => cell_value.starts_with(*self),
-                "DOES_NOT_CONTAIN" => !cell_value.contains(*self),
+                "CONTAINS" => cell_value.contains(&*self),
+                "STARTS_WITH" => cell_value.starts_with(&*self),
+                "DOES_NOT_CONTAIN" => !cell_value.contains(&*self),
                 _ => false,
             },
 
@@ -161,10 +157,8 @@ impl CompareValue for &str {
 }
 
 /// Implements CompareValue for a Vec<&str> reference
-impl CompareValue for Vec<&str> {
+impl CompareValue for Vec<String> {
     fn apply(&self, cell_value: &str, operation: &str, compare_as: &str) -> bool {
-        //dbg!(&self, &cell_value, &operation, &compare_as);
-
         if operation.starts_with("FUZZ_MIN_SCORE_") && compare_as == "TEXT" {
             // Extract the score threshold from the operation string
             let score_threshold: i32 = operation["FUZZ_MIN_SCORE_".len()..].parse().unwrap_or(70);
@@ -185,7 +179,7 @@ impl CompareValue for Vec<&str> {
             let words: Vec<&str> = cleaned_cell_value.split_whitespace().collect();
             let mut all_scores = vec![];
 
-            for &value in self.iter() {
+            for value in self.iter() {
                 let value_word_count = value.split_whitespace().count();
                 let mut futures = vec![];
 
@@ -227,7 +221,7 @@ pub struct CalibConfig {
 /// This struct allows for a fluent interface to build and write to a CSV file,
 /// supporting method chaining. It uses a generic writer to handle different types
 /// of outputs, primarily working with file-based writing.
-#[derive(Debug)] 
+#[derive(Debug)]
 pub struct CsvBuilder {
     headers: Vec<String>,
     data: Vec<Vec<String>>,
@@ -790,14 +784,15 @@ impl CsvBuilder {
 
             // Evaluate each expression
             for (expr_name, exp) in &expressions {
-                if let Some(column_index) = headers.iter().position(|h| h == exp.column) {
+                if let Some(column_index) = headers.iter().position(|h| h == &exp.column) {
                     if let Some(cell_value) = row.get(column_index) {
                         let result = match &exp.compare_with {
                             ExpVal::STR(value_str) => {
-                                value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                value_str.apply(cell_value, &exp.operator, &exp.compare_as)
                             }
                             ExpVal::VEC(values) => {
-                                values.apply(cell_value, exp.operator, exp.compare_as)
+                                //let value_refs: Vec<&str> = values.iter().map(String::as_str).collect();
+                                values.apply(cell_value, &exp.operator, &exp.compare_as)
                             }
                         };
                         expr_results.insert(*expr_name, result);
@@ -1309,7 +1304,6 @@ impl CsvBuilder {
     pub fn where_(&mut self, expressions: Vec<(&str, Exp)>, result_expression: &str) -> &mut Self {
         // Clone headers and data to avoid borrowing issues
         let headers_clone = self.headers.clone();
-        //let data_clone = self.data.clone();
 
         // First, drain the data to get ownership of the rows
         let mut drained_data = self.data.drain(..).collect::<Vec<_>>();
@@ -1324,14 +1318,15 @@ impl CsvBuilder {
 
                 // Evaluate each expression
                 for (expr_name, exp) in &expressions {
-                    if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                    if let Some(column_index) = headers_clone.iter().position(|h| h == &exp.column)
+                    {
                         if let Some(cell_value) = row.get(column_index) {
                             let result = match &exp.compare_with {
                                 ExpVal::STR(value_str) => {
-                                    value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                    value_str.apply(cell_value, &exp.operator, &exp.compare_as)
                                 }
                                 ExpVal::VEC(values) => {
-                                    values.apply(cell_value, exp.operator, exp.compare_as)
+                                    values.apply(cell_value, &exp.operator, &exp.compare_as)
                                 }
                             };
                             expr_results.insert(*expr_name, result);
@@ -1345,13 +1340,10 @@ impl CsvBuilder {
                 }
 
                 // Evaluate the final result expression and filter rows where it is true
-                let result = self.evaluate_result_expression(&expr_results, result_expression);
-                // dbg!(&expr_results, result_expression, &result);
-                result
+                self.evaluate_result_expression(&expr_results, result_expression)
             })
             .collect();
 
-        // dbg!(&filtered_data);
         self.data = filtered_data;
 
         self
@@ -1377,14 +1369,14 @@ impl CsvBuilder {
 
                 // Evaluate each expression
                 for (expr_name, exp) in &expressions {
-                    if let Some(column_index) = headers.iter().position(|h| h == exp.column) {
+                    if let Some(column_index) = headers.iter().position(|h| h == &exp.column) {
                         if let Some(cell_value) = row.get(column_index) {
                             let result = match &exp.compare_with {
                                 ExpVal::STR(value_str) => {
-                                    value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                    value_str.apply(cell_value, &exp.operator, &exp.compare_as)
                                 }
                                 ExpVal::VEC(values) => {
-                                    values.apply(cell_value, exp.operator, exp.compare_as)
+                                    values.apply(cell_value, &exp.operator, &exp.compare_as)
                                 }
                             };
                             expr_results.insert(*expr_name, result);
@@ -1404,78 +1396,6 @@ impl CsvBuilder {
 
         // Print the count
         println!("Count: {}", count);
-
-        self
-    }
-
-    pub fn where_set(
-        &mut self,
-        conditions: Vec<(&str, Exp)>,
-        logical_expression: &str,
-        target_column: &str,
-        set_value: &str,
-    ) -> &mut Self {
-        if conditions.is_empty() {
-            // No conditions provided, do nothing
-            return self;
-        }
-
-        // Clone headers to avoid borrowing issues
-        let headers_clone = self.headers.clone();
-
-        // Move self.data out temporarily to avoid borrow conflicts
-        let mut data_clone = std::mem::replace(&mut self.data, vec![]);
-
-        // Iterate through rows and apply conditions
-        data_clone.iter_mut().for_each(|row| {
-            // Evaluate each condition
-            let mut condition_results = HashMap::new();
-            condition_results.insert("true", true);
-            condition_results.insert("false", false);
-
-            for (cond_name, condition) in &conditions {
-                if let Some(column_index) = headers_clone.iter().position(|h| h == condition.column)
-                {
-                    if let Some(cell_value) = row.get(column_index) {
-                        let result = match &condition.compare_with {
-                            ExpVal::STR(value_str) => value_str.apply(
-                                cell_value,
-                                condition.operator,
-                                condition.compare_as,
-                            ),
-                            ExpVal::VEC(values) => {
-                                values.apply(cell_value, condition.operator, condition.compare_as)
-                            }
-                        };
-                        condition_results.insert(*cond_name, result);
-                    } else {
-                        println!("Column '{}' not found in headers.", condition.column);
-                        condition_results.insert(*cond_name, false);
-                    }
-                } else {
-                    println!("Column '{}' not found in headers.", condition.column);
-                    condition_results.insert(*cond_name, false);
-                }
-            }
-
-            // Evaluate the logical expression to determine whether to set the value
-            let eval_result =
-                self.evaluate_result_expression(&condition_results, logical_expression);
-            if eval_result {
-                if let Some(target_column_index) =
-                    headers_clone.iter().position(|h| h == target_column)
-                {
-                    if let Some(target) = row.get_mut(target_column_index) {
-                        *target = set_value.to_string();
-                    }
-                } else {
-                    println!("Target column '{}' not found in headers.", target_column);
-                }
-            }
-        });
-
-        // Replace self.data with the modified data_clone
-        self.data = data_clone;
 
         self
     }
@@ -1542,14 +1462,14 @@ impl CsvBuilder {
             expr_results.insert("false", false);
 
             for (expr_name, exp) in &expressions {
-                if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                if let Some(column_index) = headers_clone.iter().position(|h| h == &exp.column) {
                     if let Some(cell_value) = row.get(column_index) {
                         let result = match &exp.compare_with {
                             ExpVal::STR(value_str) => {
-                                value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                value_str.apply(cell_value, &exp.operator, &exp.compare_as)
                             }
                             ExpVal::VEC(values) => {
-                                values.apply(cell_value, exp.operator, exp.compare_as)
+                                values.apply(cell_value, &exp.operator, &exp.compare_as)
                             }
                         };
                         expr_results.insert(*expr_name, result);
@@ -2189,18 +2109,22 @@ impl CsvBuilder {
 
             // Evaluate each expression
             for (expr_name, exp) in &expressions {
-                if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                if let Some(column_index) = headers_clone.iter().position(|h| h == &exp.column) {
                     if let Some(cell_value) = row.get(column_index) {
                         let result = match &exp.compare_with {
                             ExpVal::STR(value_str) => {
-                                value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                value_str.apply(cell_value, &exp.operator, &exp.compare_as)
                             }
                             ExpVal::VEC(values) => {
-                                values.apply(cell_value, exp.operator, exp.compare_as)
+                                values.apply(cell_value, &exp.operator, &exp.compare_as)
                             }
                         };
                         expr_results.insert(*expr_name, result);
+                    } else {
+                        expr_results.insert(*expr_name, false);
                     }
+                } else {
+                    expr_results.insert(*expr_name, false);
                 }
             }
 
@@ -2241,14 +2165,15 @@ impl CsvBuilder {
 
                 // Evaluate each expression in the category
                 for (expr_name, exp) in expressions {
-                    if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                    if let Some(column_index) = headers_clone.iter().position(|h| h == &exp.column)
+                    {
                         if let Some(cell_value) = row.get(column_index) {
                             let result = match &exp.compare_with {
                                 ExpVal::STR(value_str) => {
-                                    value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                    value_str.apply(cell_value, &exp.operator, &exp.compare_as)
                                 }
                                 ExpVal::VEC(values) => {
-                                    values.apply(cell_value, exp.operator, exp.compare_as)
+                                    values.apply(cell_value, &exp.operator, &exp.compare_as)
                                 }
                             };
                             expr_results.insert(*expr_name, result);
@@ -2527,12 +2452,6 @@ impl CsvBuilder {
                 }
             }
 
-            /*
-            top_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-            top_matches.truncate(get_best_count);
-            //dbg!(&row.get(column_index), &top_matches);
-            */
-
             // Sort and truncate the list to get the best matches
             top_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
             top_matches.truncate(get_best_count);
@@ -2697,23 +2616,18 @@ impl CsvBuilder {
             expr_results.insert("false", false);
 
             for (expr_name, exp) in &expressions {
-                if let Some(column_index) = headers_clone.iter().position(|h| h == exp.column) {
+                if let Some(column_index) = headers_clone.iter().position(|h| h == &exp.column) {
                     if let Some(cell_value) = row.get(column_index) {
                         let result = match &exp.compare_with {
                             ExpVal::STR(value_str) => {
-                                value_str.apply(cell_value, exp.operator, exp.compare_as)
+                                value_str.apply(cell_value, &exp.operator, &exp.compare_as)
                             }
                             ExpVal::VEC(values) => {
-                                values.apply(cell_value, exp.operator, exp.compare_as)
+                                values.apply(cell_value, &exp.operator, &exp.compare_as)
                             }
                         };
-                        expr_results.insert(*expr_name, result);
-                    } else {
-                        expr_results.insert(*expr_name, false);
+                        expr_results.insert(expr_name, result);
                     }
-                } else {
-                    println!("Column '{}' not found in headers.", exp.column);
-                    expr_results.insert(*expr_name, false);
                 }
             }
 
