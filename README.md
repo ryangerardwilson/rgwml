@@ -419,12 +419,12 @@ Example 5: Load from an MSSQL Server query
         "sales_analysis", // Identifier for newly created columns
         vec![
             Train {
-                input: "I want my money back",
-                output: "refund"
+                input: "I want my money back".to_string(),
+                output: "refund".to_string()
             },
             Train {
-                input: "I want a refund immediately",
-                output: "refund"
+                input: "I want a refund immediately".to_string(),
+                output: "refund".to_string()
             },
         ],
         "WORD_SPLIT:2", // The minimum length of word combinations that training data is to be broken into
@@ -436,12 +436,12 @@ Example 5: Load from an MSSQL Server query
         "sales_analysis", // Identifier for newly created column
         vec![
             Train {
-                input: "I want my money back",
-                output: "refund"
+                input: "I want my money back".to_string(),
+                output: "refund".to_string()
             },
             Train {
-                input: "I want a refund immediately",
-                output: "refund"
+                input: "I want a refund immediately".to_string(),
+                output: "refund".to_string()
             },
         ],
         "WORD_SPLIT:2", // The minimum length of word combinations that training data is to be broken into

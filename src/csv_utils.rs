@@ -59,9 +59,9 @@ impl CsvConverter {
 }
 
 #[derive(Debug)]
-pub struct Train<'a> {
-    pub input: &'a str,
-    pub output: &'a str,
+pub struct Train {
+    pub input: String,
+    pub output: String,
 }
 
 #[derive(Debug, Clone)]
@@ -1048,10 +1048,18 @@ impl CsvBuilder {
         println!("{}", "-".repeat(table_width));
 
         // Print function for rows
-        let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>| {
+        let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>, headers_count: usize| {
+            let mut row_to_print = Vec::new();
+            for (i, cell) in row.iter().enumerate() {
+                if i < 4 || i >= headers_count - 4 {
+                    // Adjust indices based on your headers' logic
+                    row_to_print.push(cell.clone());
+                }
+            }
             println!(
                 "|{}|",
-                row.iter()
+                row_to_print
+                    .iter()
                     .zip(max_lengths.iter())
                     .map(|(cell, &max_length)| format_cell(cell, max_length))
                     .collect::<Vec<String>>()
@@ -1059,9 +1067,8 @@ impl CsvBuilder {
             );
         };
 
-        // Print all rows
         for row in self.data.iter() {
-            print_row(row, &adjusted_max_lengths);
+            print_row(row, &adjusted_max_lengths, self.headers.len());
         }
 
         // Print total number of rows
@@ -2438,7 +2445,7 @@ impl CsvBuilder {
 
                 for combo in combinations {
                     for train in &training_data {
-                        let score = fuzz::ratio(&combo, train.input) as f64;
+                        let score = fuzz::ratio(&combo, &train.input) as f64;
                         // Calculate word length difference
                         let word_length_difference =
                             ((combo.len() as isize) - (train.input.len() as isize)).abs() as f64;
@@ -2447,7 +2454,7 @@ impl CsvBuilder {
                             (score as f64) * (1.0 - (sensitivity * word_length_difference / 100.0));
 
                         // Push each score and corresponding result into top_matches
-                        top_matches.push((adjusted_score, train.output, train.input));
+                        top_matches.push((adjusted_score, &train.output, &train.input));
                     }
                 }
             }
@@ -2469,11 +2476,19 @@ impl CsvBuilder {
                 }
             }
 
+            /*
             // Collect the indices and inputs of top_matches in a separate vector
             let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
                 .iter()
                 .enumerate()
                 .map(|(index, match_)| (index, match_.2))
+                .collect();
+            */
+            // Collect the indices and inputs of top_matches in a separate vector
+            let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
+                .iter()
+                .enumerate()
+                .map(|(index, match_)| (index, &match_.2 as &str)) // Borrow match_.2 as a string slice
                 .collect();
 
             // Check if the fuzz value of the longest value is more than 85 and adjust scores
@@ -2647,7 +2662,7 @@ impl CsvBuilder {
 
                     for combo in combinations {
                         for train in &training_data {
-                            let score = fuzz::ratio(&combo, train.input) as f64;
+                            let score = fuzz::ratio(&combo, &train.input) as f64;
                             // Calculate word length difference
                             let word_length_difference =
                                 ((combo.len() as isize) - (train.input.len() as isize)).abs()
@@ -2657,7 +2672,7 @@ impl CsvBuilder {
                                 * (1.0 - (sensitivity * word_length_difference / 100.0));
 
                             // Push each score and corresponding result into top_matches
-                            top_matches.push((adjusted_score, train.output, train.input));
+                            top_matches.push((adjusted_score, &train.output, &train.input));
                         }
                     }
                 }
@@ -2683,12 +2698,19 @@ impl CsvBuilder {
                         longest_value = Some((score, output, input));
                     }
                 }
-
+                /*
                 // Collect the indices and inputs of top_matches in a separate vector
                 let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
                     .iter()
                     .enumerate()
                     .map(|(index, match_)| (index, match_.2))
+                    .collect();
+                */
+                // Collect the indices and inputs of top_matches in a separate vector
+                let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
+                    .iter()
+                    .enumerate()
+                    .map(|(index, match_)| (index, &match_.2 as &str)) // Borrow match_.2 as a string slice
                     .collect();
 
                 // Check if the fuzz value of the longest value is more than 85 and adjust scores
