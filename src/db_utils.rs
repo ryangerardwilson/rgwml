@@ -2,7 +2,7 @@
 use chrono::NaiveDateTime;
 use futures::StreamExt;
 use mysql_async::{prelude::*, OptsBuilder, Pool, Row as MySqlRow};
-use tiberius::{error::Error as TiberiusError, AuthMethod, Client, ColumnType, Config, QueryItem, Row};
+use tiberius::{error::Error, AuthMethod, Client, ColumnType, Config, QueryItem, Row};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use uuid::Uuid;
