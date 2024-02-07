@@ -2,10 +2,11 @@
 use chrono::NaiveDateTime;
 use futures::StreamExt;
 use mysql_async::{prelude::*, OptsBuilder, Pool, Row as MySqlRow};
-use tiberius::{error::Error, AuthMethod, Client, ColumnType, Config, QueryItem, Row};
+use tiberius::{error::Error as TiberiusError, AuthMethod, Client, ColumnType, Config, QueryItem, Row};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use uuid::Uuid;
+use std::error::Error;
 
 pub struct DbConnect;
 
@@ -267,7 +268,7 @@ pub async fn execute_mysql_write(
     server: &str,
     database: &str,
     sql_query: &str,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn std::error::Error>> {
     // Create an OptsBuilder instance and set the connection details
     let opts = OptsBuilder::new()
         .user(Some(username.to_string()))
