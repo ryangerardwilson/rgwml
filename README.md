@@ -51,7 +51,7 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 2. `db_utils`
 -----------
 
-Easily query a MSSQL or MYSQL server
+### Easily query a MSSQL or MYSQL server to extract data
 
     use rgwml::db_utils::DbConnect;
 
@@ -67,6 +67,23 @@ Easily query a MSSQL or MYSQL server
         let headers = result.0;
         let row_data = result.1;
     }
+
+### Easily query a MYSQL server to write data
+
+Easily query a MSSQL or MYSQL server to extract data
+
+    use rgwml::db_utils::DbConnect;
+
+    #[tokio::main]
+    async fn main() {
+        let result = DbConnect::execute_mysql_write(
+            "username", 
+            "password", 
+            "server/host", 
+            "database", 
+            ""INSERT INTO your_table (column1, column2) VALUES ('value1', 'value2')").await?;
+    }
+
 
 3. `csv_utils`
 ------------
