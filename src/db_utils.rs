@@ -6,7 +6,6 @@ use tiberius::{error::Error, AuthMethod, Client, ColumnType, Config, QueryItem, 
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use uuid::Uuid;
-use std::error::Error;
 
 pub struct DbConnect;
 
