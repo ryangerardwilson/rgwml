@@ -261,31 +261,31 @@ impl DbConnect {
         Ok((headers, data))
     }
 
-pub async fn execute_mysql_write(
-    username: &str,
-    password: &str,
-    server: &str,
-    database: &str,
-    sql_query: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Create an OptsBuilder instance and set the connection details
-    let opts = OptsBuilder::new()
-        .user(Some(username.to_string()))
-        .pass(Some(password.to_string()))
-        .ip_or_hostname(Some(server.to_string()))
-        .db_name(Some(database.to_string()));
+    pub async fn execute_mysql_write(
+        username: &str,
+        password: &str,
+        server: &str,
+        database: &str,
+        sql_query: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Create an OptsBuilder instance with default settings
+        let opts = OptsBuilder::default()
+            .user(Some(username.to_string()))
+            .pass(Some(password.to_string()))
+            .ip_or_hostname(Some(server.to_string()))
+            .db_name(Some(database.to_string()));
 
-    // Create a pool with the constructed Opts
-    let pool = Pool::new(opts);
+        // Create a pool with the constructed Opts
+        let pool = Pool::new(opts);
 
-    // Get a connection from the pool
-    let mut conn = pool.get_conn().await?;
+        // Get a connection from the pool
+        let mut conn = pool.get_conn().await?;
 
-    // Execute the query without expecting any result set
-    conn.exec_drop(sql_query, ()).await?;
+        // Execute the query without expecting any result set
+        conn.exec_drop(sql_query, ()).await?;
 
-    // Return Ok if the query executed successfully
-    Ok(())
-}
+        // Return Ok if the query executed successfully
+        Ok(())
+    }
 
 }
