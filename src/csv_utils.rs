@@ -205,15 +205,15 @@ impl CompareValue for Vec<String> {
 }
 
 pub struct Piv {
-    pub index_at: &'static str,
-    pub values_from: &'static str,
-    pub operation: &'static str,
-    pub seggregate_by: Vec<(&'static str, &'static str)>,
+    pub index_at: String,
+    pub values_from: String,
+    pub operation: String,
+    pub seggregate_by: Vec<(String, String)>,
 }
 
 pub struct CalibConfig {
-    pub header_is_at_row: &'static str,
-    pub rows_range_from: (&'static str, &'static str),
+    pub header_is_at_row: String,
+    pub rows_range_from: (String, String),
 }
 
 /// A flexible builder for creating and writing to CSV files.
@@ -375,7 +375,7 @@ impl CsvBuilder {
             .saturating_sub(3);
 
         // Determine the end_index based on the second value of rows_range_from
-        let end_index = match config.rows_range_from.1 {
+        let end_index = match config.rows_range_from.1.as_str() {
             "*" => self.data.len(), // "*" represents 'until the end'
             end_str => end_str
                 .parse::<usize>()
@@ -2802,7 +2802,7 @@ impl CsvBuilder {
     }
 
     /// Pivots a CSV
-    pub fn pivot_as<'a>(&'a mut self, path: &str, piv: Piv) -> &mut Self {
+    pub fn pivot_as(&mut self, path: &str, piv: Piv) -> &mut Self {
         let mut pivot_data: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
 
         // Finding positions of the necessary columns
@@ -2821,15 +2821,27 @@ impl CsvBuilder {
                 return self;
             }
         };
-
-        // Collecting positions and types for the segmentation columns
+        /*
+                // Collecting positions and types for the segmentation columns
+                let seg_cols_info: Vec<_> = piv
+                    .seggregate_by
+                    .iter()
+                    .filter_map(|&(col, seg_type)| {
+                        self.headers
+                            .iter()
+                            .position(|x| x == col)
+                            .map(|pos| (pos, seg_type))
+                    })
+                    .collect();
+        */
         let seg_cols_info: Vec<_> = piv
             .seggregate_by
             .iter()
-            .filter_map(|&(col, seg_type)| {
+            .filter_map(|(ref col, seg_type)| {
+                // Ensure col is borrowed if not already
                 self.headers
                     .iter()
-                    .position(|x| x == col)
+                    .position(|x| x == col) // Here col is now a reference
                     .map(|pos| (pos, seg_type))
             })
             .collect();
@@ -2844,8 +2856,8 @@ impl CsvBuilder {
             let index_value = index.trim().to_string();
             let segments_entry = pivot_data.entry(index_value).or_insert_with(HashMap::new);
 
-            for &(col, seg_type) in &piv.seggregate_by {
-                match seg_type {
+            for (col, seg_type) in &piv.seggregate_by {
+                match seg_type.as_str() {
                     "AS_BOOLEAN" => {
                         segments_entry
                             .entry(col.to_string())
@@ -2872,10 +2884,14 @@ impl CsvBuilder {
             let index_value = &row[index_col_pos];
             let value: f64 = row[value_col_pos].parse().unwrap_or(0.0);
 
-            for &(col, seg_type) in &piv.seggregate_by {
-                let col_pos = self.headers.iter().position(|x| x == col).unwrap();
+            for (col, seg_type) in &piv.seggregate_by {
+                let col_pos = self
+                    .headers
+                    .iter()
+                    .position(|x| *x == col.as_str())
+                    .unwrap();
 
-                match seg_type {
+                match seg_type.as_str() {
                     "AS_BOOLEAN" => {
                         if row[col_pos] == "1" {
                             let seg_key = col.to_string();
@@ -2888,7 +2904,11 @@ impl CsvBuilder {
                         }
                     }
                     "AS_CATEGORY" => {
-                        let col_pos = self.headers.iter().position(|x| x == col).unwrap();
+                        let col_pos = self
+                            .headers
+                            .iter()
+                            .position(|x| *x == col.as_str())
+                            .unwrap();
                         let category_value = row[col_pos].clone();
                         //dbg!(&col, &col_pos, &category_value);
                         pivot_data
@@ -2958,8 +2978,8 @@ impl CsvBuilder {
                 // Add values for AS_BOOLEAN columns
                 for (col, seg_type) in &piv.seggregate_by {
                     if *seg_type == "AS_BOOLEAN" {
-                        if let Some(segment_values) = segments.get(*col) {
-                            let segment_total: f64 = match piv.operation {
+                        if let Some(segment_values) = segments.get(col) {
+                            let segment_total: f64 = match piv.operation.as_str() {
                                 "COUNT" => segment_values.len() as f64,
                                 "SUM" => segment_values.iter().sum(),
                                 "MEAN" => {
@@ -2999,7 +3019,7 @@ impl CsvBuilder {
                 // Add values for AS_CATEGORY columns
                 for category in &sorted_categories {
                     if let Some(segment_values) = segments.get(category) {
-                        let segment_total: f64 = match piv.operation {
+                        let segment_total: f64 = match piv.operation.as_str() {
                             "COUNT" => segment_values.len() as f64,
                             "SUM" => segment_values.iter().sum(),
                             "MEAN" => {

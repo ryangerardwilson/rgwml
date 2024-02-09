@@ -231,8 +231,8 @@ Example 5: Load from an MSSQL Server query
     // A. Calibrating an irrugularly formatted file
     .calibrate(
         CalibConfig {
-            header_is_at_row: "21",
-            rows_range_from: ("23", "*")
+            header_is_at_row: "21".to_string(),
+            rows_range_from: ("23".to_string(), "*".to_string())
         }) // sets the row 21 content as the header, and row 23 to last row content as the data
 
     // B. Setting and adding headers
@@ -269,16 +269,16 @@ Example 5: Load from an MSSQL Server query
         10,
         vec![
             ("Exp1", Exp {
-                column: "Withdrawal Amt.",
-                operator: "<",
+                column: "Withdrawal Amt.".to_string(),
+                operator: "<".to_string(),
                 compare_with: ExpVal::STR("1000".to_string()),
-                compare_as: "NUMBERS" // Also: "TEXT", "TIMESTAMPS"
+                compare_as: "NUMBERS".to_string() // Also: "TEXT", "TIMESTAMPS"
             }),
             ("Exp2", Exp {
-                column: "Withdrawal Type",
-                operator: "==",
+                column: "Withdrawal Type".to_string(),
+                operator: "==".to_string(),
                 compare_with: ExpVal::STR("Urgent".to_string()),
-                compare_as: "TEXT"
+                compare_as: "TEXT".to_string()
             }),
         ],
         "Exp1 && Exp2",
@@ -290,46 +290,46 @@ Example 5: Load from an MSSQL Server query
     .where_(
         vec![
             ("Exp1", Exp {
-                column: "customer_type",
-                operator: "==",
+                column: "customer_type".to_string(),
+                operator: "==".to_string(),
                 compare_with: ExpVal::STR("REGULAR".to_string()),
-                compare_as: "TEXT" // Also: "NUMBERS", "TIMESTAMPS"
+                compare_as: "TEXT".to_string() // Also: "NUMBERS", "TIMESTAMPS"
             }),
             ("Exp2", Exp {
-                column: "invoice_data",
-                operator: ">",
+                column: "invoice_data".to_string(),
+                operator: ">".to_string(),
                 compare_with: ExpVal::STR("2023-12-31 23:59:59".to_string()),
-                compare_as: "TEXT"
+                compare_as: "TEXT".to_string()
             }),
             ("Exp3", Exp {
-                column: "invoice_amount",
-                operator: "<",
+                column: "invoice_amount".to_string(),
+                operator: "<".to_string(),
                 compare_with: ExpVal::STR("1000".to_string()),
-                compare_as: "NUMBERS"
+                compare_as: "NUMBERS".to_string()
             }),
             ("Exp4", Exp {
-                column: "address",
-                operator: "FUZZ_MIN_SCORE_60",
+                column: "address".to_string(),
+                operator: "FUZZ_MIN_SCORE_60".to_string(),
                 compare_with: ExpVal::VEC(vec!["public school".to_string()]),
-                compare_as: "TEXT"
+                compare_as: "TEXT".to_string()
             }),
             ("Exp5", Exp {
-                column: "status",
-                operator: "CONTAINS",
+                column: "status".to_string(),
+                operator: "CONTAINS".to_string(),
                 compare_with: ExpVal::STR("REJECTED".to_string()),
-                compare_as: "TEXT"
+                compare_as: "TEXT".to_string()
             }),
             ("Exp6", Exp {
-                column: "status",
-                operator: "DOES_NOT_CONTAIN",
+                column: "status".to_string(),
+                operator: "DOES_NOT_CONTAIN".to_string(),
                 compare_with: ExpVal::STR("HAS NOT PAID".to_string()),
-                compare_as: "TEXT"
+                compare_as: "TEXT".to_string()
             }),
             ("Exp7", Exp {
-                column: "status",
-                operator: "STARTS_WITH",
+                column: "status".to_string(),
+                operator: "STARTS_WITH".to_string(),
                 compare_with: ExpVal::STR("VERIFIED".to_string()),
-                compare_as: "TEXT"
+                compare_as: "TEXT".to_string()
             }),
         ],
         "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
@@ -403,10 +403,10 @@ Example 5: Load from an MSSQL Server query
                 "< 1000",
                 vec![
                     ("Exp1", Exp {
-                        column: "Withdrawal Amt.",
-                        operator: "<",
+                        column: "Withdrawal Amt.".to_string(),
+                        operator: "<".to_string(),
                         compare_with: ExpVal::STR("1000".to_string()),
-                        compare_as: "NUMBERS" // Also: "TEXT", "TIMESTAMPS"
+                        compare_as: "NUMBERS".to_string() // Also: "TEXT", "TIMESTAMPS"
                     }),
                 ],
                 "Exp1"
@@ -415,16 +415,16 @@ Example 5: Load from an MSSQL Server query
                 "1000-5000",
                 vec![
                     ("Exp1", Exp {
-                        column: "Withdrawal Amt.",
-                        operator: ">=",
+                        column: "Withdrawal Amt.".to_string(),
+                        operator: ">=".to_string(),
                         compare_with: ExpVal::STR("1000".to_string()),
-                        compare_as: "NUMBERS"
+                        compare_as: "NUMBERS".to_string()
                     }),
                     ("Exp2", Exp {
-                        column: "Withdrawal Amt.",
-                        operator: "<",
+                        column: "Withdrawal Amt.".to_string(),
+                        operator: "<".to_string(),
                         compare_with: ExpVal::STR("5000".to_string()),
-                        compare_as: "NUMBERS"
+                        compare_as: "NUMBERS".to_string()
                     }),
                 ],
                 "Exp1 && Exp2"
@@ -466,10 +466,10 @@ Example 5: Load from an MSSQL Server query
         "GET_BEST:2", // Get the top 2 results, max value is 3
         vec![
             ("Exp1", Exp {
-                column: "Deposit Amt.",
-                operator: ">",
+                column: "Deposit Amt.".to_string(),
+                operator: ">".to_string(),
                 compare_with: ExpVal::STR("500".to_string()),
-                compare_as: "NUMBERS" // Also: "TEXT", "TIMESTAMPS"
+                compare_as: "NUMBERS".to_string() // Also: "TEXT", "TIMESTAMPS"
             }),
         ],
         "Exp1", // Filters rows where fuzzai analysis would be applied
@@ -480,12 +480,12 @@ Example 5: Load from an MSSQL Server query
     .pivot_as(
         "/path/to/save/the/pivot/file/as/csv",
         Piv {
-            index_at: "month",
-            values_from: "sales",
-            operation: "MEDIAN",
+            index_at: "month".to_string(),
+            values_from: "sales".to_string(),
+            operation: "MEDIAN".to_string(), // Also: "COUNT", "SUM", "MEAN"
             seggregate_by: vec![
-                ("is_customer", "AS_BOOLEAN") // Is appended directly as a seggregation column
-                ("acquisition_type", "AS_CATEGORY") // The unique values of this column are appended as seggregation columns
+                ("is_customer", "AS_BOOLEAN".to_string()) // Is appended directly as a seggregation column
+                ("acquisition_type", "AS_CATEGORY".to_string()) // The unique values of this column are appended as seggregation columns
             ],
         })
 
