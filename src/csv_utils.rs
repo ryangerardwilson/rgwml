@@ -25,6 +25,47 @@ use std::time::{Duration, SystemTime};
 /// A utility struct for converting JSON data to CSV format.
 pub struct CsvConverter;
 
+#[derive(Debug)]
+pub struct Piv {
+    pub index_at: String,
+    pub values_from: String,
+    pub operation: String,
+    pub seggregate_by: Vec<(String, String)>,
+}
+
+pub struct CalibConfig {
+    pub header_is_at_row: String,
+    pub rows_range_from: (String, String),
+}
+
+#[derive(Debug)]
+pub struct CsvBuilder {
+    headers: Vec<String>,
+    data: Vec<Vec<String>>,
+    limit: Option<usize>,
+    error: Option<Box<dyn Error>>,
+}
+
+#[derive(Debug)]
+pub struct Train {
+    pub input: String,
+    pub output: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Exp {
+    pub column: String,
+    pub operator: String,
+    pub compare_with: ExpVal,
+    pub compare_as: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExpVal {
+    STR(String),
+    VEC(Vec<String>),
+}
+
 impl CsvConverter {
     pub fn from_json(json_data: &str, file_path: &str) -> Result<(), Box<dyn Error>> {
         let data: Value = serde_json::from_str(json_data)?;
@@ -56,26 +97,6 @@ impl CsvConverter {
         wtr.flush()?;
         Ok(())
     }
-}
-
-#[derive(Debug)]
-pub struct Train {
-    pub input: String,
-    pub output: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct Exp {
-    pub column: String,
-    pub operator: String,
-    pub compare_with: ExpVal,
-    pub compare_as: String,
-}
-
-#[derive(Debug, Clone)]
-pub enum ExpVal {
-    STR(String),
-    VEC(Vec<String>),
 }
 
 /// Defines the trait for comparison values
@@ -202,31 +223,6 @@ impl CompareValue for Vec<String> {
             false
         }
     }
-}
-
-pub struct Piv {
-    pub index_at: String,
-    pub values_from: String,
-    pub operation: String,
-    pub seggregate_by: Vec<(String, String)>,
-}
-
-pub struct CalibConfig {
-    pub header_is_at_row: String,
-    pub rows_range_from: (String, String),
-}
-
-/// A flexible builder for creating and writing to CSV files.
-///
-/// This struct allows for a fluent interface to build and write to a CSV file,
-/// supporting method chaining. It uses a generic writer to handle different types
-/// of outputs, primarily working with file-based writing.
-#[derive(Debug)]
-pub struct CsvBuilder {
-    headers: Vec<String>,
-    data: Vec<Vec<String>>,
-    limit: Option<usize>,
-    error: Option<Box<dyn Error>>,
 }
 
 impl CsvBuilder {
@@ -2803,6 +2799,8 @@ impl CsvBuilder {
 
     /// Pivots a CSV
     pub fn pivot_as(&mut self, path: &str, piv: Piv) -> &mut Self {
+        //dbg!(&piv);
+
         let mut pivot_data: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
 
         // Finding positions of the necessary columns
@@ -2821,19 +2819,7 @@ impl CsvBuilder {
                 return self;
             }
         };
-        /*
-                // Collecting positions and types for the segmentation columns
-                let seg_cols_info: Vec<_> = piv
-                    .seggregate_by
-                    .iter()
-                    .filter_map(|&(col, seg_type)| {
-                        self.headers
-                            .iter()
-                            .position(|x| x == col)
-                            .map(|pos| (pos, seg_type))
-                    })
-                    .collect();
-        */
+
         let seg_cols_info: Vec<_> = piv
             .seggregate_by
             .iter()
@@ -2953,7 +2939,7 @@ impl CsvBuilder {
                 }
             }
 
-            dbg!(&all_categories);
+            //dbg!(&all_categories);
 
             // Sort the category values if needed and add them to the headers
             let mut sorted_categories: Vec<_> = all_categories.into_iter().collect();
@@ -2969,11 +2955,10 @@ impl CsvBuilder {
 
             //let mut total_pushed: bool = false;
             // Write data in horizontal format
+            sorted_keys.sort();
             for index in sorted_keys {
                 let mut row = vec![index.clone()];
                 let segments = pivot_data.get(index).unwrap();
-                let mut total: f64 = 0.0;
-                let mut total_assessed: bool = false;
 
                 // Add values for AS_BOOLEAN columns
                 for (col, seg_type) in &piv.seggregate_by {
@@ -3007,9 +2992,8 @@ impl CsvBuilder {
                                 }
                                 _ => 0.0, // Handle the default case or error
                             };
-                            total += segment_total;
+
                             row.push(format!("{:.2}", segment_total));
-                            total_assessed = true;
                         } else {
                             row.push("0.00".to_string()); // Default value if the segment doesn't exist
                         }
@@ -3047,20 +3031,62 @@ impl CsvBuilder {
                             }
                             _ => 0.0, // Handle the default case or error
                         };
-                        if total_assessed == false {
-                            total += segment_total;
-                        }
                         row.push(format!("{:.2}", segment_total));
                     } else {
                         row.push("0.00".to_string()); // Default value if the segment doesn't exist
                     }
                 }
 
-                // Add the total value at the end of the row
-                //if total_pushed == false{
-                row.push(format!("{:.2}", total));
-                //total_pushed = true;
-                //}
+                // Add values for the Value column
+                let matching_values: Vec<f64> = self
+                    .data
+                    .iter()
+                    .filter_map(|row| {
+                        if row
+                            .get(index_col_pos)
+                            .map_or(false, |index_at_value| index_at_value == index)
+                        {
+                            row.get(value_col_pos)
+                                .and_then(|value| value.parse::<f64>().ok())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                // Perform the specified operation on the matching values
+                let aggregate = match piv.operation.as_str() {
+                    "COUNT" => matching_values.len() as f64,
+                    "SUM" => matching_values.iter().sum(),
+                    "MEAN" => {
+                        if !matching_values.is_empty() {
+                            matching_values.iter().sum::<f64>() / matching_values.len() as f64
+                        } else {
+                            0.0
+                        }
+                    }
+                    "MEDIAN" => {
+                        if !matching_values.is_empty() {
+                            let mut sorted_vals = matching_values.clone();
+                            sorted_vals.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+                            if sorted_vals.len() % 2 == 0 {
+                                let mid = sorted_vals.len() / 2;
+                                (sorted_vals[mid - 1] + sorted_vals[mid]) / 2.0
+                            } else {
+                                sorted_vals[sorted_vals.len() / 2]
+                            }
+                        } else {
+                            0.0
+                        }
+                    }
+                    _ => {
+                        eprintln!("Error: Unrecognized operation '{}'", piv.operation);
+                        0.0
+                    }
+                };
+
+                // Remember to include the rest of your logic to handle CSV writing or any other processing.
+                row.push(format!("{:.2}", aggregate));
 
                 // Ensure the row has the same number of fields as the headers
                 if row.len() != headers.len() {

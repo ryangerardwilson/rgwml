@@ -483,7 +483,7 @@ Example 5: Load from an MSSQL Server query
             index_at: "month".to_string(),
             values_from: "sales".to_string(),
             operation: "MEDIAN".to_string(), // Also: "COUNT", "SUM", "MEAN"
-            seggregate_by: vec![
+            seggregate_by: vec![  // Set to vec![] if seggregation is not required
                 ("is_customer", "AS_BOOLEAN".to_string()) // Is appended directly as a seggregation column
                 ("acquisition_type", "AS_CATEGORY".to_string()) // The unique values of this column are appended as seggregation columns
             ],
