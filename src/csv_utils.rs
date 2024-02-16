@@ -10,7 +10,6 @@ use fuzzywuzzy::fuzz;
 use rand::{seq::SliceRandom, thread_rng};
 use regex::Regex;
 use serde_json::Value;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
@@ -1165,59 +1164,53 @@ impl CsvBuilder {
         self
     }
 
-    pub fn cascade_sort<'a>(&'a mut self, orders: Vec<(&'a str, &'a str)>) -> &'a mut Self {
-        //println!("cascade_sort called");
 
-        if let Some(_header_row) = self.data.first().cloned() {
-            //println!("Header row: {:?}", header_row);
+pub fn cascade_sort(&mut self, orders: Vec<(String, String)>) -> &mut Self {
+    // Assuming `self.headers` and `self.data` are defined, and `self.data` is sortable
+    
+    let column_indices: HashMap<&str, usize> = self
+        .headers
+        .iter()
+        .enumerate()
+        .map(|(i, name)| (name.as_str(), i))
+        .collect();
 
-            // Assuming `self.headers` contains the correct column names
-            let column_indices: HashMap<&str, usize> = self
-                .headers
-                .iter()
-                .enumerate()
-                .map(|(i, name)| {
-                    //println!("Column name found: '{}'", name); // Debug print
-                    (name.as_str(), i)
-                })
-                .collect();
+    self.data.sort_by(|a, b| {
+        let mut cmp = std::cmp::Ordering::Equal;
+        for (column_name, order) in &orders {
+            if let Some(&index) = column_indices.get(column_name.as_str()) {
+                let a_val = &a[index];
+                let b_val = &b[index];
 
-            self.data[0..].sort_by(|a, b| {
-                let mut cmp = Ordering::Equal;
-                for (column_name, order) in &orders {
-                    if let Some(&index) = column_indices.get(column_name) {
-                        let a_val = &a[index];
-                        let b_val = &b[index];
-
-                        cmp = if let (Ok(a_num), Ok(b_num)) =
-                            (a_val.parse::<f64>(), b_val.parse::<f64>())
-                        {
-                            // Both values are numbers, compare as f64
-                            if order == &"ASC" {
-                                a_num.partial_cmp(&b_num).unwrap_or(Ordering::Equal)
-                            } else {
-                                b_num.partial_cmp(&a_num).unwrap_or(Ordering::Equal)
-                            }
-                        } else {
-                            // At least one value is not a number, compare as string
-                            if order == &"ASC" {
-                                a_val.cmp(b_val)
-                            } else {
-                                b_val.cmp(a_val)
-                            }
-                        };
-
-                        if cmp != Ordering::Equal {
-                            break;
-                        }
+                cmp = if let (Ok(a_num), Ok(b_num)) = (a_val.parse::<f64>(), b_val.parse::<f64>()) {
+                    // Both values are numbers, compare as f64
+                    if order == "ASC" {
+                        a_num.partial_cmp(&b_num).unwrap_or(std::cmp::Ordering::Equal)
+                    } else {
+                        b_num.partial_cmp(&a_num).unwrap_or(std::cmp::Ordering::Equal)
                     }
-                }
-                cmp
-            });
-        }
+                } else {
+                    // At least one value is not a number, compare as string
+                    if order == "ASC" {
+                        a_val.cmp(b_val)
+                    } else {
+                        b_val.cmp(a_val)
+                    }
+                };
 
-        self
-    }
+                if cmp != std::cmp::Ordering::Equal {
+                    break;
+                }
+            }
+        }
+        cmp
+    });
+
+    self
+}
+
+
+
 
     /// Drops specified columns from the CSV data.
     pub fn drop_columns(&mut self, columns: Vec<&str>) -> &mut Self {

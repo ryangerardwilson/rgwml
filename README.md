@@ -190,7 +190,7 @@ Example 5: Load from an MSSQL Server query
     let _ = CsvBuilder::from_csv("/path/to/your/file.csv")
         .rename_columns(vec![("OLD_COLUMN", "NEW_COLUMN")])
         .drop_columns(vec!["UNUSED_COLUMN"])
-        .cascade_sort(vec![("COLUMN", "ASC")])
+        .cascade_sort(vec![("COLUMN".to_string(), "ASC".to_string())])
         .where_(
             vec![
                 ("Exp1", Exp {
