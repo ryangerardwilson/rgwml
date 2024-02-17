@@ -27,3 +27,6 @@ uuid = "1.6.1"
 mysql_async = "0.33.0"
 warp = "0.3.6"
 
+[lib]
+doctest = false
+

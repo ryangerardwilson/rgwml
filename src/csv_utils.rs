@@ -3206,3 +3206,37 @@ impl CsvResultCacher {
         Ok(())
     }
 }
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_creates_empty_builder() {
+        let builder = CsvBuilder::new();
+        assert!(builder.headers.is_empty());
+        assert!(builder.data.is_empty());
+    }
+
+    #[test]
+    fn test_add_row_adds_single_row() {
+        let mut builder = CsvBuilder::new();
+        builder.add_row(vec!["a", "b", "c"]);
+        assert_eq!(builder.data.len(), 1);
+        assert_eq!(builder.data[0], vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+    }
+
+    #[test]
+    fn test_add_rows_adds_multiple_rows() {
+        let mut builder = CsvBuilder::new();
+        builder.add_rows(vec![
+            vec!["a", "b", "c"],
+            vec!["d", "e", "f"],
+        ]);
+        assert_eq!(builder.data.len(), 2);
+        assert_eq!(builder.data[1], vec!["d".to_string(), "e".to_string(), "f".to_string()]);
+    }
+}
+
