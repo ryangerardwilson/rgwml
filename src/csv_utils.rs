@@ -1072,7 +1072,6 @@ impl CsvBuilder {
         self
     }
 
-    /// Aesthetically prints the frequency of all unique values in the indicated columns, sorted by frequency.
     pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
         let mut column_indices = Vec::new();
 
@@ -1095,14 +1094,14 @@ impl CsvBuilder {
                 }
             }
 
-            // Sorting the frequency map
+            // Sorting the frequency map by key (value) in ascending alphabetical order
             let mut sorted_freq: Vec<(String, usize)> = freq_map.into_iter().collect();
-            sorted_freq.sort_by(|a, b| b.1.cmp(&a.1));
+            sorted_freq.sort_by(|a, b| a.0.cmp(&b.0));
 
             // Print the frequencies
             println!("\nFrequency for column '{}':", self.headers[col_idx]);
             for (value, count) in sorted_freq {
-                println!("{}: {}", value, count);
+                println!("  {}: {}", value, count);
             }
         }
 
@@ -1164,53 +1163,55 @@ impl CsvBuilder {
         self
     }
 
+    pub fn cascade_sort(&mut self, orders: Vec<(String, String)>) -> &mut Self {
+        // Assuming `self.headers` and `self.data` are defined, and `self.data` is sortable
 
-pub fn cascade_sort(&mut self, orders: Vec<(String, String)>) -> &mut Self {
-    // Assuming `self.headers` and `self.data` are defined, and `self.data` is sortable
-    
-    let column_indices: HashMap<&str, usize> = self
-        .headers
-        .iter()
-        .enumerate()
-        .map(|(i, name)| (name.as_str(), i))
-        .collect();
+        let column_indices: HashMap<&str, usize> = self
+            .headers
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.as_str(), i))
+            .collect();
 
-    self.data.sort_by(|a, b| {
-        let mut cmp = std::cmp::Ordering::Equal;
-        for (column_name, order) in &orders {
-            if let Some(&index) = column_indices.get(column_name.as_str()) {
-                let a_val = &a[index];
-                let b_val = &b[index];
+        self.data.sort_by(|a, b| {
+            let mut cmp = std::cmp::Ordering::Equal;
+            for (column_name, order) in &orders {
+                if let Some(&index) = column_indices.get(column_name.as_str()) {
+                    let a_val = &a[index];
+                    let b_val = &b[index];
 
-                cmp = if let (Ok(a_num), Ok(b_num)) = (a_val.parse::<f64>(), b_val.parse::<f64>()) {
-                    // Both values are numbers, compare as f64
-                    if order == "ASC" {
-                        a_num.partial_cmp(&b_num).unwrap_or(std::cmp::Ordering::Equal)
+                    cmp = if let (Ok(a_num), Ok(b_num)) =
+                        (a_val.parse::<f64>(), b_val.parse::<f64>())
+                    {
+                        // Both values are numbers, compare as f64
+                        if order == "ASC" {
+                            a_num
+                                .partial_cmp(&b_num)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        } else {
+                            b_num
+                                .partial_cmp(&a_num)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        }
                     } else {
-                        b_num.partial_cmp(&a_num).unwrap_or(std::cmp::Ordering::Equal)
-                    }
-                } else {
-                    // At least one value is not a number, compare as string
-                    if order == "ASC" {
-                        a_val.cmp(b_val)
-                    } else {
-                        b_val.cmp(a_val)
-                    }
-                };
+                        // At least one value is not a number, compare as string
+                        if order == "ASC" {
+                            a_val.cmp(b_val)
+                        } else {
+                            b_val.cmp(a_val)
+                        }
+                    };
 
-                if cmp != std::cmp::Ordering::Equal {
-                    break;
+                    if cmp != std::cmp::Ordering::Equal {
+                        break;
+                    }
                 }
             }
-        }
-        cmp
-    });
+            cmp
+        });
 
-    self
-}
-
-
-
+        self
+    }
 
     /// Drops specified columns from the CSV data.
     pub fn drop_columns(&mut self, columns: Vec<&str>) -> &mut Self {
