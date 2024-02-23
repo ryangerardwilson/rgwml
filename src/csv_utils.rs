@@ -3135,7 +3135,7 @@ let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>, headers_count: usi
 
 
 
-    pub fn search_table(&mut self, search_string: &str) -> &mut Self {
+    pub fn contains_search(&mut self, search_string: &str) -> &mut Self {
 
         let filtered_data = self.data
             .iter()

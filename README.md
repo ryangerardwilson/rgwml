@@ -285,8 +285,12 @@ Example 5: Load from an MSSQL Server query
         "TAKE:FIRST" // Also: TAKE:LAST, TAKE:RANDOM
         )
     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
+
+    // H. Search operations
+    .contains_search("needle")
+
     
-    // H. Applying conditional operations
+    // I. Applying conditional operations
     .where_(
         vec![
             ("Exp1", Exp {
@@ -341,7 +345,7 @@ Example 5: Load from an MSSQL Server query
         "Column10",
         "IS OKAY")
 
-    // I. Analytical Prints for data inspection
+    // J. Analytical Prints for data inspection
     .print_columns()
     .print_row_count()
     .print_first_row()
@@ -371,10 +375,10 @@ Example 5: Load from an MSSQL Server query
         ],
         "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
 
-    // J. Grouping Data
+    // K. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
 
-    // K. Basic Set Theory Operations (for the Universe U = {1,2,3,4,5,6,7}, A = {1,2,3} and B = {3,4,5})
+    // L. Basic Set Theory Operations (for the Universe U = {1,2,3,4,5,6,7}, A = {1,2,3} and B = {3,4,5})
     .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL") // {1,2,3,3,4,5} 
     .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL_WITHOUT_DUPLICATES") // {1,2,3,4,5}
     .set_intersection_with("/path/to/set_b/file.csv") // {3}
@@ -385,11 +389,11 @@ Example 5: Load from an MSSQL Server query
     .set_complement_with("/path/to/universe_set_u/file.csv", vec!["INCLUDE_ALL"]) 
     .set_complement_with("/path/to/universe_set_u/file.csv", vec!["Column4", "Column5"]) 
 
-    // L. Advanced Set Theory Operations
+    // M. Advanced Set Theory Operations
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:LEFT_JOIN_AT{{Column1}}") // Left join using "Column1" as the join column.
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
 
-    // M. Append Derivative Columns
+    // N. Append Derivative Columns
     .append_derived_boolean_column(
         "is_qualified_for_discount",
         vec![
@@ -476,7 +480,7 @@ Example 5: Load from an MSSQL Server query
         )
     .split_date_as_appended_category_columns("Column10", "%d/%m/%y") // Appends additional columns splitting a date/timestamp into categorization columns by year, month and week
 
-    // N. Pivot Tables
+    // O. Pivot Tables
     .pivot_as(
         "/path/to/save/the/pivot/file/as/csv",
         Piv {
@@ -489,10 +493,10 @@ Example 5: Load from an MSSQL Server query
             ],
         })
 
-    // O. Save
+    // P. Save
     .save_as("/path/to/your/file2.csv")
 
-    // P. Die
+    // Q. Die
     .die() // Gracefully terminates execution of a CsvBuilder chain
 
 #### Extract Data
