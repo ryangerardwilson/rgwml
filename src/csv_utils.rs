@@ -1045,34 +1045,33 @@ impl CsvBuilder {
         );
         println!("{}", "-".repeat(table_width));
 
-let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>, headers_count: usize| {
-    let mut row_to_print = Vec::new();
-    if headers_count > 7 {
-        for i in 0..4 {
-            // Add the first 4 columns
-            row_to_print.push(row[i].clone());
-        }
-        // Add the ellipsis placeholder for omitted columns
-        row_to_print.push("...".to_string());
-        for i in (headers_count - 3)..headers_count {
-            // Add the last 3 columns, adjusting index as needed
-            row_to_print.push(row[i].clone());
-        }
-    } else {
-        // If there are 7 or fewer headers, just add all columns without omission
-        row_to_print.extend_from_slice(row);
-    }
-    println!(
-        "|{}|",
-        row_to_print
-            .iter()
-            .zip(max_lengths.iter())
-            .map(|(cell, &max_length)| format_cell(cell, max_length))
-            .collect::<Vec<String>>()
-            .join("|")
-    );
-};
-
+        let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>, headers_count: usize| {
+            let mut row_to_print = Vec::new();
+            if headers_count > 7 {
+                for i in 0..4 {
+                    // Add the first 4 columns
+                    row_to_print.push(row[i].clone());
+                }
+                // Add the ellipsis placeholder for omitted columns
+                row_to_print.push("...".to_string());
+                for i in (headers_count - 3)..headers_count {
+                    // Add the last 3 columns, adjusting index as needed
+                    row_to_print.push(row[i].clone());
+                }
+            } else {
+                // If there are 7 or fewer headers, just add all columns without omission
+                row_to_print.extend_from_slice(row);
+            }
+            println!(
+                "|{}|",
+                row_to_print
+                    .iter()
+                    .zip(max_lengths.iter())
+                    .map(|(cell, &max_length)| format_cell(cell, max_length))
+                    .collect::<Vec<String>>()
+                    .join("|")
+            );
+        };
 
         for row in self.data.iter() {
             print_row(row, &adjusted_max_lengths, self.headers.len());
@@ -1083,8 +1082,6 @@ let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>, headers_count: usi
 
         self
     }
-
-
 
     pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
         let mut column_indices = Vec::new();
@@ -3133,11 +3130,9 @@ let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>, headers_count: usi
         &self.data
     }
 
-
-
     pub fn contains_search(&mut self, search_string: &str) -> &mut Self {
-
-        let filtered_data = self.data
+        let filtered_data = self
+            .data
             .iter()
             .filter(|row| row.iter().any(|cell| cell.contains(search_string)))
             .cloned() // Clone the filtered rows to a new Vec<Vec<String>>
@@ -3146,18 +3141,16 @@ let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>, headers_count: usi
         // Create a temporary CsvBuilder instance with the filtered data
         let mut temp_csv_builder = CsvBuilder {
             headers: self.headers.clone(), // Clone headers from the original instance
-            data: filtered_data, // Use filtered data
-            limit: self.limit, // Copy the limit, if any
-            error: None, // Assuming no error for the temp instance
+            data: filtered_data,           // Use filtered data
+            limit: self.limit,             // Copy the limit, if any
+            error: None,                   // Assuming no error for the temp instance
         };
 
         // Call print_table_all_rows on the temporary instance
         temp_csv_builder.print_table_all_rows();
 
         self
-
     }
-
 }
 
 /// Represents a caching mechanism for CSV results, holding a data generator, cache path, and cache duration.
@@ -3229,8 +3222,4 @@ impl CsvResultCacher {
         }
         Ok(())
     }
-
 }
-
-
-
