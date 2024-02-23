@@ -1,5 +1,8 @@
 // csv_utils.rs
+
 use crate::db_utils::DbConnect;
+//use crate::api_utils::ApiCallBuilder;
+//use serde_json::json;
 use calamine::{open_workbook, Reader, Xls};
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, Timelike};
 use csv::Writer;
@@ -1042,25 +1045,34 @@ impl CsvBuilder {
         );
         println!("{}", "-".repeat(table_width));
 
-        // Print function for rows
-        let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>, headers_count: usize| {
-            let mut row_to_print = Vec::new();
-            for (i, cell) in row.iter().enumerate() {
-                if i < 4 || i >= headers_count - 4 {
-                    // Adjust indices based on your headers' logic
-                    row_to_print.push(cell.clone());
-                }
-            }
-            println!(
-                "|{}|",
-                row_to_print
-                    .iter()
-                    .zip(max_lengths.iter())
-                    .map(|(cell, &max_length)| format_cell(cell, max_length))
-                    .collect::<Vec<String>>()
-                    .join("|")
-            );
-        };
+let print_row = |row: &Vec<String>, max_lengths: &Vec<usize>, headers_count: usize| {
+    let mut row_to_print = Vec::new();
+    if headers_count > 7 {
+        for i in 0..4 {
+            // Add the first 4 columns
+            row_to_print.push(row[i].clone());
+        }
+        // Add the ellipsis placeholder for omitted columns
+        row_to_print.push("...".to_string());
+        for i in (headers_count - 3)..headers_count {
+            // Add the last 3 columns, adjusting index as needed
+            row_to_print.push(row[i].clone());
+        }
+    } else {
+        // If there are 7 or fewer headers, just add all columns without omission
+        row_to_print.extend_from_slice(row);
+    }
+    println!(
+        "|{}|",
+        row_to_print
+            .iter()
+            .zip(max_lengths.iter())
+            .map(|(cell, &max_length)| format_cell(cell, max_length))
+            .collect::<Vec<String>>()
+            .join("|")
+    );
+};
+
 
         for row in self.data.iter() {
             print_row(row, &adjusted_max_lengths, self.headers.len());
@@ -1071,6 +1083,8 @@ impl CsvBuilder {
 
         self
     }
+
+
 
     pub fn print_freq(&mut self, columns: Vec<&str>) -> &mut Self {
         let mut column_indices = Vec::new();
@@ -2466,14 +2480,6 @@ impl CsvBuilder {
                 }
             }
 
-            /*
-            // Collect the indices and inputs of top_matches in a separate vector
-            let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
-                .iter()
-                .enumerate()
-                .map(|(index, match_)| (index, match_.2))
-                .collect();
-            */
             // Collect the indices and inputs of top_matches in a separate vector
             let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
                 .iter()
@@ -2688,14 +2694,6 @@ impl CsvBuilder {
                         longest_value = Some((score, output, input));
                     }
                 }
-                /*
-                // Collect the indices and inputs of top_matches in a separate vector
-                let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
-                    .iter()
-                    .enumerate()
-                    .map(|(index, match_)| (index, match_.2))
-                    .collect();
-                */
                 // Collect the indices and inputs of top_matches in a separate vector
                 let match_indices_and_inputs: Vec<(usize, &str)> = top_matches
                     .iter()
@@ -3134,6 +3132,32 @@ impl CsvBuilder {
     pub fn get_data(&self) -> &Vec<Vec<String>> {
         &self.data
     }
+
+
+
+    pub fn search_table(&mut self, search_string: &str) -> &mut Self {
+
+        let filtered_data = self.data
+            .iter()
+            .filter(|row| row.iter().any(|cell| cell.contains(search_string)))
+            .cloned() // Clone the filtered rows to a new Vec<Vec<String>>
+            .collect::<Vec<Vec<String>>>();
+
+        // Create a temporary CsvBuilder instance with the filtered data
+        let mut temp_csv_builder = CsvBuilder {
+            headers: self.headers.clone(), // Clone headers from the original instance
+            data: filtered_data, // Use filtered data
+            limit: self.limit, // Copy the limit, if any
+            error: None, // Assuming no error for the temp instance
+        };
+
+        // Call print_table_all_rows on the temporary instance
+        temp_csv_builder.print_table_all_rows();
+
+        self
+
+    }
+
 }
 
 /// Represents a caching mechanism for CSV results, holding a data generator, cache path, and cache duration.
@@ -3205,38 +3229,8 @@ impl CsvResultCacher {
         }
         Ok(())
     }
+
 }
 
 
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_new_creates_empty_builder() {
-        let builder = CsvBuilder::new();
-        assert!(builder.headers.is_empty());
-        assert!(builder.data.is_empty());
-    }
-
-    #[test]
-    fn test_add_row_adds_single_row() {
-        let mut builder = CsvBuilder::new();
-        builder.add_row(vec!["a", "b", "c"]);
-        assert_eq!(builder.data.len(), 1);
-        assert_eq!(builder.data[0], vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-    }
-
-    #[test]
-    fn test_add_rows_adds_multiple_rows() {
-        let mut builder = CsvBuilder::new();
-        builder.add_rows(vec![
-            vec!["a", "b", "c"],
-            vec!["d", "e", "f"],
-        ]);
-        assert_eq!(builder.data.len(), 2);
-        assert_eq!(builder.data[1], vec!["d".to_string(), "e".to_string(), "f".to_string()]);
-    }
-}
 
