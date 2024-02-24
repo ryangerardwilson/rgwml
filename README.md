@@ -2,7 +2,7 @@
 
 ***Author: Ryan Gerard Wilson (https://ryangerardwilson.com)***
 
-This library simplifies Data Science, Machine Learning, and Artifical Intelligence operations. It's designed to leverage the best features of RUST, in a manner that is graceful, elegant, and ticklishly fun to build upon.
+This library simplifies Data Science, Machine Learning, and Artifical Intelligence operations. It's designed to be graceful, elegant, and BATSHIT fun.
 
 1. Overview
 -----------
