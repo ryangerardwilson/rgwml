@@ -3130,7 +3130,7 @@ impl CsvBuilder {
         &self.data
     }
 
-    pub fn contains_search(&mut self, search_string: &str) -> &mut Self {
+    pub fn print_contains_search_results(&mut self, search_string: &str) -> &mut Self {
         let filtered_data = self
             .data
             .iter()
@@ -3148,6 +3148,428 @@ impl CsvBuilder {
 
         // Call print_table_all_rows on the temporary instance
         temp_csv_builder.print_table_all_rows();
+
+        self
+    }
+
+    pub fn print_not_contains_search_results(&mut self, search_string: &str) -> &mut Self {
+        let filtered_data = self
+            .data
+            .iter()
+            .filter(|row| !row.iter().any(|cell| cell.contains(search_string))) // Use ! to negate the condition
+            .cloned() // Clone the filtered rows to a new Vec<Vec<String>>
+            .collect::<Vec<Vec<String>>>();
+
+        // Create a temporary CsvBuilder instance with the filtered data
+        let mut temp_csv_builder = CsvBuilder {
+            headers: self.headers.clone(), // Clone headers from the original instance
+            data: filtered_data,           // Use filtered data
+            limit: self.limit,             // Copy the limit, if any
+            error: None,                   // Assuming no error for the temp instance
+        };
+
+        // Call print_table_all_rows on the temporary instance
+        temp_csv_builder.print_table_all_rows();
+
+        self
+    }
+
+    // Function to print rows where at least one cell starts with the search string
+    pub fn print_starts_with_search_results(&mut self, search_string: &str) -> &mut Self {
+        let filtered_data = self
+            .data
+            .iter()
+            .filter(|row| row.iter().any(|cell| cell.starts_with(search_string)))
+            .cloned() // Clone the filtered rows to a new Vec<Vec<String>>
+            .collect::<Vec<Vec<String>>>();
+
+        // Create a temporary CsvBuilder instance with the filtered data
+        let mut temp_csv_builder = CsvBuilder {
+            headers: self.headers.clone(), // Clone headers from the original instance
+            data: filtered_data,           // Use filtered data
+            limit: self.limit,             // Copy the limit, if any
+            error: None,                   // Assuming no error for the temp instance
+        };
+
+        // Call print_table_all_rows on the temporary instance
+        temp_csv_builder.print_table_all_rows();
+
+        self
+    }
+
+    // Function to print rows where no cell starts with the search string
+    pub fn print_not_starts_with_search_results(&mut self, search_string: &str) -> &mut Self {
+        let filtered_data = self
+            .data
+            .iter()
+            .filter(|row| !row.iter().any(|cell| cell.starts_with(search_string))) // Use ! to negate the condition
+            .cloned() // Clone the filtered rows to a new Vec<Vec<String>>
+            .collect::<Vec<Vec<String>>>();
+
+        // Create a temporary CsvBuilder instance with the filtered data
+        let mut temp_csv_builder = CsvBuilder {
+            headers: self.headers.clone(), // Clone headers from the original instance
+            data: filtered_data,           // Use filtered data
+            limit: self.limit,             // Copy the limit, if any
+            error: None,                   // Assuming no error for the temp instance
+        };
+
+        // Call print_table_all_rows on the temporary instance
+        temp_csv_builder.print_table_all_rows();
+
+        self
+    }
+
+    pub fn print_raw_levenshtein_search_results(
+        &mut self,
+        search_string: &str,
+        max_lev_distance: usize,
+        column_names: Vec<&str>,
+    ) -> &mut Self {
+        fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+            // Convert both strings to lowercase for case-insensitive comparison
+            let s1 = s1.to_lowercase();
+            let s2 = s2.to_lowercase();
+
+            let s1_len = s1.chars().count();
+            let s2_len = s2.chars().count();
+            let mut cost = vec![vec![0; s2_len + 1]; s1_len + 1];
+
+            for i in 0..=s1_len {
+                cost[i][0] = i;
+            }
+            for j in 0..=s2_len {
+                cost[0][j] = j;
+            }
+
+            for i in 1..=s1_len {
+                for j in 1..=s2_len {
+                    let sub_cost = if s1.chars().nth(i - 1) == s2.chars().nth(j - 1) {
+                        0
+                    } else {
+                        1
+                    };
+                    cost[i][j] = *[
+                        cost[i - 1][j] + 1,
+                        cost[i][j - 1] + 1,
+                        cost[i - 1][j - 1] + sub_cost,
+                    ]
+                    .iter()
+                    .min()
+                    .unwrap();
+                }
+            }
+
+            cost[s1_len][s2_len]
+        }
+
+        fn print_statistics(distances: &[usize]) {
+            if distances.is_empty() {
+                println!("No data to calculate statistics.");
+                return;
+            }
+
+            // Sort distances to calculate median correctly and to list frequencies in order
+            let mut sorted_distances = distances.to_vec();
+            sorted_distances.sort_unstable();
+
+            println!();
+            let mean: f64 = sorted_distances.iter().map(|&val| val as f64).sum::<f64>()
+                / sorted_distances.len() as f64;
+            println!("Mean: {:.2}", mean);
+
+            let median: f64 = if sorted_distances.len() % 2 == 0 {
+                let mid = sorted_distances.len() / 2;
+                (sorted_distances[mid - 1] + sorted_distances[mid]) as f64 / 2.0
+            } else {
+                sorted_distances[sorted_distances.len() / 2] as f64
+            };
+            println!("Median: {:.2}", median);
+
+            let mut occurrences = HashMap::new();
+            for &value in &sorted_distances {
+                *occurrences.entry(value).or_insert(0) += 1;
+            }
+
+            let mode = occurrences
+                .iter()
+                .max_by_key(|&(_, count)| count)
+                .map(|(&val, _)| val);
+            if let Some(mode_value) = mode {
+                println!("Mode: {}", mode_value);
+            } else {
+                println!("Mode: N/A");
+            }
+
+            // Print the frequency of each distance value from min to max
+            println!("Frequencies:");
+            let mut keys: Vec<_> = occurrences.keys().collect();
+            keys.sort_unstable(); // Sort the keys to ensure the frequencies are printed in ascending order
+            for &key in keys {
+                if let Some(&count) = occurrences.get(&key) {
+                    println!("  Distance {}: {} occurrences", key, count);
+                }
+            }
+        }
+
+        let apply_to_all_columns = column_names.len() == 1 && column_names[0] == "*";
+        let column_indexes: Vec<usize> = if apply_to_all_columns {
+            (0..self.headers.len()).collect()
+        } else {
+            self.headers
+                .iter()
+                .enumerate()
+                .filter_map(|(index, header)| {
+                    column_names.contains(&header.as_str()).then(|| index)
+                })
+                .collect()
+        };
+
+        let mut scored_data: Vec<(Vec<String>, usize)> = self
+            .data
+            .iter()
+            .filter_map(|row| {
+                let scores: Vec<usize> = row
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, cell)| {
+                        if apply_to_all_columns || column_indexes.contains(&index) {
+                            Some(levenshtein_distance(cell, search_string))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                let min_distance = scores.into_iter().min().unwrap_or(usize::MAX);
+                if min_distance <= max_lev_distance {
+                    Some((row.clone(), min_distance))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by Levenshtein distance in ascending order and print table
+        scored_data.sort_by(|a, b| a.1.cmp(&b.1));
+        let sorted_filtered_data: Vec<Vec<String>> =
+            scored_data.iter().map(|(row, _)| row.clone()).collect();
+        let distances: Vec<usize> = scored_data.iter().map(|&(_, dist)| dist).collect();
+
+        let mut temp_csv_builder = CsvBuilder {
+            headers: self.headers.clone(),
+            data: sorted_filtered_data,
+            limit: self.limit,
+            error: None,
+        };
+
+        temp_csv_builder.print_table_all_rows();
+
+        println!();
+        // Print sorted distances from min to max
+        println!(
+            "Distances (min to max): {}",
+            distances
+                .iter()
+                .map(|d| d.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+        );
+        // Calculate and print mean, median, and mode
+        print_statistics(&distances);
+
+        self
+    }
+
+
+    pub fn print_vectorized_levenshtein_search_results(
+        &mut self,
+        search_strings: Vec<&str>,
+        max_lev_distance: usize,
+        column_names: Vec<&str>,
+    ) -> &mut Self {
+        fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+            // Convert both strings to lowercase for case-insensitive comparison
+            let s1 = s1.to_lowercase();
+            let s2 = s2.to_lowercase();
+
+            let s1_len = s1.chars().count();
+            let s2_len = s2.chars().count();
+            let mut cost = vec![vec![0; s2_len + 1]; s1_len + 1];
+
+            for i in 0..=s1_len {
+                cost[i][0] = i;
+            }
+            for j in 0..=s2_len {
+                cost[0][j] = j;
+            }
+
+            for i in 1..=s1_len {
+                for j in 1..=s2_len {
+                    let sub_cost = if s1.chars().nth(i - 1) == s2.chars().nth(j - 1) {
+                        0
+                    } else {
+                        1
+                    };
+                    cost[i][j] = *[
+                        cost[i - 1][j] + 1,
+                        cost[i][j - 1] + 1,
+                        cost[i - 1][j - 1] + sub_cost,
+                    ]
+                    .iter()
+                    .min()
+                    .unwrap();
+                }
+            }
+
+            cost[s1_len][s2_len]
+        }
+
+        fn print_statistics(distances: &[usize]) {
+            if distances.is_empty() {
+                println!("No data to calculate statistics.");
+                return;
+            }
+
+            // Sort distances to calculate median correctly and to list frequencies in order
+            let mut sorted_distances = distances.to_vec();
+            sorted_distances.sort_unstable();
+
+            println!();
+            let mean: f64 = sorted_distances.iter().map(|&val| val as f64).sum::<f64>()
+                / sorted_distances.len() as f64;
+            println!("Mean: {:.2}", mean);
+
+            let median: f64 = if sorted_distances.len() % 2 == 0 {
+                let mid = sorted_distances.len() / 2;
+                (sorted_distances[mid - 1] + sorted_distances[mid]) as f64 / 2.0
+            } else {
+                sorted_distances[sorted_distances.len() / 2] as f64
+            };
+            println!("Median: {:.2}", median);
+
+            let mut occurrences = HashMap::new();
+            for &value in &sorted_distances {
+                *occurrences.entry(value).or_insert(0) += 1;
+            }
+
+            let mode = occurrences
+                .iter()
+                .max_by_key(|&(_, count)| count)
+                .map(|(&val, _)| val);
+            if let Some(mode_value) = mode {
+                println!("Mode: {}", mode_value);
+            } else {
+                println!("Mode: N/A");
+            }
+
+            // Print the frequency of each distance value from min to max
+            println!("Frequencies:");
+            let mut keys: Vec<_> = occurrences.keys().collect();
+            keys.sort_unstable(); // Sort the keys to ensure the frequencies are printed in ascending order
+            for &key in keys {
+                if let Some(&count) = occurrences.get(&key) {
+                    println!("  Distance {}: {} occurrences", key, count);
+                }
+            }
+        }
+        let apply_to_all_columns = column_names.len() == 1 && column_names[0] == "*";
+
+        let column_indexes: Vec<usize> = if apply_to_all_columns {
+            (0..self.headers.len()).collect()
+        } else {
+            self.headers
+                .iter()
+                .enumerate()
+                .filter_map(|(index, header)| {
+                    column_names.contains(&header.as_str()).then(|| index)
+                })
+                .collect()
+        };
+
+        dbg!(&search_strings, &max_lev_distance, &column_names);
+
+        let mut scored_data: Vec<(Vec<String>, usize)> = self
+            .data
+            .iter()
+            .filter_map(|row| {
+                let min_distance_across_search_strings: usize = search_strings
+                    .iter()
+                    .map(|&search_string| {
+                        let search_words: Vec<&str> = search_string.split_whitespace().collect();
+                        let search_word_count = search_words.len();
+
+                        row.iter()
+                            .enumerate()
+                            .filter_map(|(index, cell)| {
+                                if apply_to_all_columns || column_indexes.contains(&index) {
+                                    let cell_words: Vec<&str> = cell.split_whitespace().collect();
+                                    let cell_word_count = cell_words.len();
+
+                                    if cell_word_count >= search_word_count {
+                                        // Directly return the computed distances, avoiding nested Option
+                                        return Some(
+                                            (search_word_count..=cell_word_count)
+                                                .map(|window_size| {
+                                                    cell_words
+                                                        .windows(window_size)
+                                                        .map(|window| {
+                                                            levenshtein_distance(
+                                                                &window.join(" "),
+                                                                search_string,
+                                                            )
+                                                        })
+                                                        .min()
+                                                        .unwrap_or(usize::MAX) // Handle Option<usize> from .min()
+                                                })
+                                                .min()
+                                                .unwrap_or(usize::MAX),
+                                        ); // Minimize across window sizes, then unwrap
+                                    }
+                                }
+                                None
+                            })
+                            .min()
+                            .unwrap_or(usize::MAX) // Minimize across all cells for this search string
+                    })
+                    .min()
+                    .unwrap_or(usize::MAX); // Minimize across all search strings to find the overall minimum for the row
+
+                if min_distance_across_search_strings <= max_lev_distance {
+                    Some((row.clone(), min_distance_across_search_strings))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by Levenshtein distance in ascending order and print table
+        scored_data.sort_by(|a, b| a.1.cmp(&b.1));
+        let sorted_filtered_data: Vec<Vec<String>> =
+            scored_data.iter().map(|(row, _)| row.clone()).collect();
+        let distances: Vec<usize> = scored_data.iter().map(|&(_, dist)| dist).collect();
+
+        let mut temp_csv_builder = CsvBuilder {
+            headers: self.headers.clone(),
+            data: sorted_filtered_data,
+            limit: self.limit,
+            error: None,
+        };
+
+        temp_csv_builder.print_table_all_rows();
+
+        // After printing the table, print sorted distances from min to max
+        println!();
+        println!(
+            "Distances (min to max): {}",
+            distances
+                .iter()
+                .map(|d| d.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+        );
+        // Calculate and print mean, median, and mode
+        print_statistics(&distances);
 
         self
     }

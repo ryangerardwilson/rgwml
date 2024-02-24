@@ -287,9 +287,13 @@ Example 5: Load from an MSSQL Server query
     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
 
     // H. Search operations
-    .contains_search("needle")
+    .print_contains_search_results("needle") // Prints rows where any cell contains the needle
+    .print_not_contains_search_results("needle") // Prints rows where no cell contains the needle
+    .print_starts_with_search_results("needle") // Prints rows where any cell starts with the needle
+    .print_not_starts_with_search_results("needle") // Prints rows where no cell starts with the needle
+    .print_raw_levenshtein_search_results("needle", 10, ["column1", "column2"]) // Prints rows where cells in column1, column2 have a levenshtein distance of less than 10 vis-a-vis the needle
+    .print_vectorized_levenshtein_search_results(["awesome", "good job"], max_lev_distance, ["column1", "column2"]) // Dynamically compares each needle against successive combinations of words within the cell values from the indicated columns, considering the minimum word count of the needle. It computes the Levenshtein distance for each needle qua the cell value, and for each such comparison the cell value is considered based on every combination of constituent words accruing from the minimum distance found within a specified maximum distance (max_lev_distance). This approach allows matching based on the proximity of words, providing a more contextually relevant search. For instance, if the cell contains "django is a good boy", it generates and compares distances for combinations like "django is", "is a", "a good", "good boy", up to the full cell content, ultimately considering the closest match. The minimum levenshtein distance acorss all needles for that cell value is then considered as the basis for filtering.
 
-    
     // I. Applying conditional operations
     .where_(
         vec![
