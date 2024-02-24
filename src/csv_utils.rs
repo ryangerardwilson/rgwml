@@ -3487,7 +3487,7 @@ impl CsvBuilder {
                 .collect()
         };
 
-        dbg!(&search_strings, &max_lev_distance, &column_names);
+        //dbg!(&search_strings, &max_lev_distance, &column_names);
 
         let mut scored_data: Vec<(Vec<String>, usize)> = self
             .data
