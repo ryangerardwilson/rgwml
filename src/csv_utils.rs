@@ -2952,8 +2952,6 @@ impl CsvBuilder {
                 // Add values for AS_BOOLEAN columns
                 for (col, seg_type) in &piv.seggregate_by {
                     if *seg_type == "AS_BOOLEAN" {
-
-
                         if let Some(segment_values) = segments.get(col) {
                             let segment_total: f64 = match piv.operation.as_str() {
                                 "COUNT" => segment_values.len() as f64,
@@ -2982,15 +2980,16 @@ impl CsvBuilder {
                                     }
                                 }
 
-                                        "BOOL_PERCENT" => {
-            let ones_count = segment_values.iter().filter(|&&v| v == 1.0).count() as f64;
-            let total_count = segment_values.len() as f64;
-            if total_count > 0.0 {
-                (ones_count / total_count) * 100.0
-            } else {
-                0.0
-            }
-        }
+                                "BOOL_PERCENT" => {
+                                    let ones_count =
+                                        segment_values.iter().filter(|&&v| v == 1.0).count() as f64;
+                                    let total_count = segment_values.len() as f64;
+                                    if total_count > 0.0 {
+                                        (ones_count / total_count) * 100.0
+                                    } else {
+                                        0.0
+                                    }
+                                }
 
                                 _ => 0.0, // Handle the default case or error
                             };
@@ -2999,8 +2998,6 @@ impl CsvBuilder {
                         } else {
                             row.push("0.00".to_string()); // Default value if the segment doesn't exist
                         }
-
-
                     }
                 }
 
@@ -3033,16 +3030,16 @@ impl CsvBuilder {
                                     0.0
                                 }
                             }
-        "BOOL_PERCENT" => {
-            let ones_count = segment_values.iter().filter(|&&v| v == 1.0).count() as f64;
-            let total_count = segment_values.len() as f64;
-            if total_count > 0.0 {
-                (ones_count / total_count) * 100.0
-            } else {
-                0.0
-            }
-        }
-
+                            "BOOL_PERCENT" => {
+                                let ones_count =
+                                    segment_values.iter().filter(|&&v| v == 1.0).count() as f64;
+                                let total_count = segment_values.len() as f64;
+                                if total_count > 0.0 {
+                                    (ones_count / total_count) * 100.0
+                                } else {
+                                    0.0
+                                }
+                            }
 
                             _ => 0.0, // Handle the default case or error
                         };
@@ -3095,15 +3092,16 @@ impl CsvBuilder {
                         }
                     }
 
-    "BOOL_PERCENT" => {
-        let ones_count = matching_values.iter().filter(|&&v| v == 1.0).count() as f64;
-        let total_count = matching_values.len() as f64;
-        if total_count > 0.0 {
-            (ones_count / total_count) * 100.0
-        } else {
-            0.0
-        }
-    }
+                    "BOOL_PERCENT" => {
+                        let ones_count =
+                            matching_values.iter().filter(|&&v| v == 1.0).count() as f64;
+                        let total_count = matching_values.len() as f64;
+                        if total_count > 0.0 {
+                            (ones_count / total_count) * 100.0
+                        } else {
+                            0.0
+                        }
+                    }
 
                     _ => {
                         eprintln!("Error: Unrecognized operation '{}'", piv.operation);
@@ -3417,7 +3415,6 @@ impl CsvBuilder {
 
         self
     }
-
 
     pub fn print_vectorized_levenshtein_search_results(
         &mut self,
