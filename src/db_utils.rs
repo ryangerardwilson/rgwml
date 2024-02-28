@@ -139,7 +139,7 @@ impl DbConnect {
                         },
                     ),
 
-                    ColumnType::Datetime => {
+                    ColumnType::Datetime | ColumnType::Datetime2 | ColumnType::Datetimen => {
                         match row.try_get::<NaiveDateTime, _>(i) {
                             Ok(Some(naive_datetime)) => naive_datetime.to_string(), // Format this appropriately
                             Ok(None) => "".to_string(),
