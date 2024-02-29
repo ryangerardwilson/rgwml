@@ -183,6 +183,13 @@ Example 5: Load from an MSSQL Server query
         "database", 
         "SELECT * from your_table").await;
 
+Example 6: Load a new instance from an existing instance
+
+    use rgwml::csv_utils::CsvBuilder;
+
+    let builder_instance_1 = CsvBuilder::from_xls("/path/to/existing/file.xls", 1);
+    let builder_instance_2 = CsvBuilder::from_copy(builder_instance_1);
+
 ####  Manipulating a CsvBuilder Object for Analysis or Saving
 
     use rgwml::csv_utils::{Exp, ExpVal, CsvBuilder, CsvConverter, CsvResultCacher};
@@ -244,12 +251,15 @@ Example 5: Load from an MSSQL Server query
     .order_columns(vec!["Column1", "...", "Column5", "Column2"])
     .order_columns(vec!["...", "Column5", "Column2"])
     .order_columns(vec!["Column1", "Column5", "..."])
-    
-    // D. Modifying columns
+
+    // D. Overriding data from another builder object
+    .override_with(other_csv_builder_object);
+
+    // E. Modifying columns
     .drop_columns(vec!["Column1", "Column3"])
     .rename_columns(vec![("Column1", "NewColumn1"), ("Column3", "NewColumn3")])
     
-    // E. Adding and modifying rows
+    // F. Adding and modifying rows
     .add_row(vec!["Row1-1", "Row1-2", "Row1-3"])
     .add_rows(vec![vec!["Row1-1", "Row1-2", "Row1-3"], vec!["Row2-1", "Row2-2", "Row2-3"]])
     .update_row_by_row_number(2, vec!["Bob", "36", "San Francisco"])
@@ -258,12 +268,12 @@ Example 5: Load from an MSSQL Server query
     .delete_row_by_id(2) // Deletes a row by id in the CSV, assuming the first column is 'id'
     .remove_duplicates()
     
-    // F. Cleaning/ Replacing Cell values
+    // G. Cleaning/ Replacing Cell values
     .trim_all() // Trims white spaces at the beginning and end of all cells in all columns.
     .replace_all(vec!["Column1", "Column2"], vec![("null", ""), ("NA", "-")]) // In specified columns
     .replace_all(vec!["*"], vec![("null", ""), ("NA", "-")]) // In all columns
     
-    // G. Limiting and sorting
+    // H. Limiting and sorting
     .limit(10)
     .limit_where(
         10,
@@ -286,7 +296,7 @@ Example 5: Load from an MSSQL Server query
         )
     .cascade_sort(vec![("Column1", "DESC"), ("Column3", "ASC")])
 
-    // H. Search operations
+    // I. Search operations
     .print_contains_search_results("needle") // Prints rows where any cell contains the needle
     .print_not_contains_search_results("needle") // Prints rows where no cell contains the needle
     .print_starts_with_search_results("needle") // Prints rows where any cell starts with the needle
@@ -294,7 +304,7 @@ Example 5: Load from an MSSQL Server query
     .print_raw_levenshtein_search_results("needle", 10, ["column1", "column2"]) // Prints rows where cells in column1, column2 have a levenshtein distance of less than 10 vis-a-vis the needle
     .print_vectorized_levenshtein_search_results(["awesome", "good job"], max_lev_distance, ["column1", "column2"]) // Dynamically compares each needle against successive combinations of words within the cell values from the indicated columns, considering the minimum word count of the needle. It computes the Levenshtein distance for each needle qua the cell value, and for each such comparison the cell value is considered based on every combination of constituent words accruing from the minimum distance found within a specified maximum distance (max_lev_distance). This approach allows matching based on the proximity of words, providing a more contextually relevant search. For instance, if the cell contains "django is a good boy", it generates and compares distances for combinations like "django is", "is a", "a good", "good boy", up to the full cell content, ultimately considering the closest match. The minimum levenshtein distance acorss all needles for that cell value is then considered as the basis for filtering.
 
-    // I. Applying conditional operations
+    // J. Applying conditional operations
     .where_(
         vec![
             ("Exp1", Exp {
@@ -349,7 +359,7 @@ Example 5: Load from an MSSQL Server query
         "Column10",
         "IS OKAY")
 
-    // J. Analytical Prints for data inspection
+    // K. Analytical Prints for data inspection
     .print_columns()
     .print_row_count()
     .print_first_row()
@@ -379,10 +389,10 @@ Example 5: Load from an MSSQL Server query
         ],
         "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
 
-    // K. Grouping Data
+    // L. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
 
-    // L. Basic Set Theory Operations (for the Universe U = {1,2,3,4,5,6,7}, A = {1,2,3} and B = {3,4,5})
+    // M. Basic Set Theory Operations (for the Universe U = {1,2,3,4,5,6,7}, A = {1,2,3} and B = {3,4,5})
     .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL") // {1,2,3,3,4,5} 
     .set_union_with("/path/to/set_b/file.csv", "UNION_TYPE:ALL_WITHOUT_DUPLICATES") // {1,2,3,4,5}
     .set_intersection_with("/path/to/set_b/file.csv") // {3}
@@ -393,11 +403,11 @@ Example 5: Load from an MSSQL Server query
     .set_complement_with("/path/to/universe_set_u/file.csv", vec!["INCLUDE_ALL"]) 
     .set_complement_with("/path/to/universe_set_u/file.csv", vec!["Column4", "Column5"]) 
 
-    // M. Advanced Set Theory Operations
+    // N. Advanced Set Theory Operations
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:LEFT_JOIN_AT{{Column1}}") // Left join using "Column1" as the join column.
     .set_union_with("/path/to/table_b.csv", "UNION_TYPE:RIGHT_JOIN_AT{{Column1}}") // Right join using "ID" as the join column.
 
-    // N. Append Derivative Columns
+    // O. Append Derivative Columns
     .append_derived_boolean_column(
         "is_qualified_for_discount",
         vec![
@@ -484,7 +494,7 @@ Example 5: Load from an MSSQL Server query
         )
     .split_date_as_appended_category_columns("Column10", "%d/%m/%y") // Appends additional columns splitting a date/timestamp into categorization columns by year, month and week
 
-    // O. Pivot Tables
+    // P. Pivot Tables
     .pivot_as(
         "/path/to/save/the/pivot/file/as/csv",
         Piv {
@@ -497,10 +507,10 @@ Example 5: Load from an MSSQL Server query
             ],
         })
 
-    // P. Save
+    // Q. Save
     .save_as("/path/to/your/file2.csv")
 
-    // Q. Die
+    // R. Die
     .die() // Gracefully terminates execution of a CsvBuilder chain
 
 #### Extract Data

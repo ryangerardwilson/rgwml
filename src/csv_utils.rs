@@ -246,12 +246,10 @@ impl CsvBuilder {
             Ok(file) => {
                 let mut rdr = csv::Reader::from_reader(file);
 
-                // Read the headers
                 if let Ok(hdrs) = rdr.headers() {
                     builder.headers = hdrs.iter().map(String::from).collect();
                 }
 
-                // Read the data rows
                 for result in rdr.records() {
                     match result {
                         Ok(record) => builder.data.push(record.iter().map(String::from).collect()),
@@ -266,6 +264,24 @@ impl CsvBuilder {
         }
 
         builder
+    }
+
+    pub fn from_copy(&self) -> Self {
+        CsvBuilder {
+            headers: self.headers.clone(),
+            data: self.data.clone(),
+            limit: self.limit,
+            error: None,
+        }
+    }
+
+    pub fn override_with(&mut self, other: &CsvBuilder) -> &mut Self {
+        self.headers = other.headers.clone();
+        self.data = other.data.clone();
+        self.limit = other.limit;
+        self.error = None; // Uncomment this line if resetting the error state is desired.
+
+        self
     }
 
     /// Reads data from a specified sheet (by index) of an XLS file at the specified `file_path`, then returns a `CsvBuilder`.
@@ -3173,16 +3189,10 @@ impl CsvBuilder {
             .cloned() // Clone the filtered rows to a new Vec<Vec<String>>
             .collect::<Vec<Vec<String>>>();
 
-        // Create a temporary CsvBuilder instance with the filtered data
-        let mut temp_csv_builder = CsvBuilder {
-            headers: self.headers.clone(), // Clone headers from the original instance
-            data: filtered_data,           // Use filtered data
-            limit: self.limit,             // Copy the limit, if any
-            error: None,                   // Assuming no error for the temp instance
-        };
+        self.data = filtered_data;
 
-        // Call print_table_all_rows on the temporary instance
-        temp_csv_builder.print_table_all_rows();
+        // Optionally, print the table to show the filtered data
+        self.print_table_all_rows();
 
         self
     }
@@ -3195,16 +3205,10 @@ impl CsvBuilder {
             .cloned() // Clone the filtered rows to a new Vec<Vec<String>>
             .collect::<Vec<Vec<String>>>();
 
-        // Create a temporary CsvBuilder instance with the filtered data
-        let mut temp_csv_builder = CsvBuilder {
-            headers: self.headers.clone(), // Clone headers from the original instance
-            data: filtered_data,           // Use filtered data
-            limit: self.limit,             // Copy the limit, if any
-            error: None,                   // Assuming no error for the temp instance
-        };
+        self.data = filtered_data;
 
-        // Call print_table_all_rows on the temporary instance
-        temp_csv_builder.print_table_all_rows();
+        // Optionally, print the table to show the filtered data
+        self.print_table_all_rows();
 
         self
     }
@@ -3218,16 +3222,10 @@ impl CsvBuilder {
             .cloned() // Clone the filtered rows to a new Vec<Vec<String>>
             .collect::<Vec<Vec<String>>>();
 
-        // Create a temporary CsvBuilder instance with the filtered data
-        let mut temp_csv_builder = CsvBuilder {
-            headers: self.headers.clone(), // Clone headers from the original instance
-            data: filtered_data,           // Use filtered data
-            limit: self.limit,             // Copy the limit, if any
-            error: None,                   // Assuming no error for the temp instance
-        };
+        self.data = filtered_data;
 
-        // Call print_table_all_rows on the temporary instance
-        temp_csv_builder.print_table_all_rows();
+        // Optionally, print the table to show the filtered data
+        self.print_table_all_rows();
 
         self
     }
@@ -3241,16 +3239,10 @@ impl CsvBuilder {
             .cloned() // Clone the filtered rows to a new Vec<Vec<String>>
             .collect::<Vec<Vec<String>>>();
 
-        // Create a temporary CsvBuilder instance with the filtered data
-        let mut temp_csv_builder = CsvBuilder {
-            headers: self.headers.clone(), // Clone headers from the original instance
-            data: filtered_data,           // Use filtered data
-            limit: self.limit,             // Copy the limit, if any
-            error: None,                   // Assuming no error for the temp instance
-        };
+        self.data = filtered_data;
 
-        // Call print_table_all_rows on the temporary instance
-        temp_csv_builder.print_table_all_rows();
+        // Optionally, print the table to show the filtered data
+        self.print_table_all_rows();
 
         self
     }
@@ -3391,14 +3383,11 @@ impl CsvBuilder {
             scored_data.iter().map(|(row, _)| row.clone()).collect();
         let distances: Vec<usize> = scored_data.iter().map(|&(_, dist)| dist).collect();
 
-        let mut temp_csv_builder = CsvBuilder {
-            headers: self.headers.clone(),
-            data: sorted_filtered_data,
-            limit: self.limit,
-            error: None,
-        };
+        // Update the original CsvBuilder instance's data with the sorted filtered data
+        self.data = sorted_filtered_data;
 
-        temp_csv_builder.print_table_all_rows();
+        // Optionally, print the table to show the sorted filtered data
+        self.print_table_all_rows();
 
         println!();
         // Print sorted distances from min to max
@@ -3410,7 +3399,8 @@ impl CsvBuilder {
                 .collect::<Vec<String>>()
                 .join(", ")
         );
-        // Calculate and print mean, median, and mode
+
+        // Calculate and print mean, median, and mode for the distances
         print_statistics(&distances);
 
         self
@@ -3583,17 +3573,14 @@ impl CsvBuilder {
             scored_data.iter().map(|(row, _)| row.clone()).collect();
         let distances: Vec<usize> = scored_data.iter().map(|&(_, dist)| dist).collect();
 
-        let mut temp_csv_builder = CsvBuilder {
-            headers: self.headers.clone(),
-            data: sorted_filtered_data,
-            limit: self.limit,
-            error: None,
-        };
+        // Update the original CsvBuilder instance's data with the sorted filtered data
+        self.data = sorted_filtered_data;
 
-        temp_csv_builder.print_table_all_rows();
+        // Optionally, print the table to show the sorted filtered data
+        self.print_table_all_rows();
 
-        // After printing the table, print sorted distances from min to max
         println!();
+        // Print sorted distances from min to max
         println!(
             "Distances (min to max): {}",
             distances
@@ -3602,7 +3589,8 @@ impl CsvBuilder {
                 .collect::<Vec<String>>()
                 .join(", ")
         );
-        // Calculate and print mean, median, and mode
+
+        // Calculate and print mean, median, and mode for the distances
         print_statistics(&distances);
 
         self
