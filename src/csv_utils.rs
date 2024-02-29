@@ -13,6 +13,10 @@ use fuzzywuzzy::fuzz;
 use rand::{seq::SliceRandom, thread_rng};
 use regex::Regex;
 use serde_json::Value;
+use smartcore::linalg::basic::matrix::DenseMatrix;
+use smartcore::linear::linear_regression::{
+    LinearRegression, LinearRegressionParameters, LinearRegressionSolverName,
+};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::error::Error;
@@ -2116,6 +2120,18 @@ impl CsvBuilder {
         expressions: Vec<(&str, Exp)>,
         result_expression: &str,
     ) -> &mut Self {
+        if let Some(index) = self.headers.iter().position(|h| h == new_column_name) {
+            // Remove the column from headers
+            self.headers.remove(index);
+
+            // Remove the corresponding data from each row
+            for row in &mut self.data {
+                if index < row.len() {
+                    row.remove(index);
+                }
+            }
+        }
+
         // Add new column header
         self.headers.push(new_column_name.to_string());
 
@@ -2166,11 +2182,297 @@ impl CsvBuilder {
         self
     }
 
+    pub fn append_derived_linear_regression_column(
+        &mut self,
+        new_column_name: &str,
+        training_predictors: Vec<Vec<String>>,
+        training_outputs: Vec<f64>,
+        output_range: Vec<f64>,
+        test_predictors_column_names: Vec<String>,
+    ) -> &mut Self {
+        fn prepare_test_predictors(
+            data: &[Vec<String>],
+            headers: &[String],
+            column_names: &[String],
+        ) -> Vec<Vec<String>> {
+            let mut predictors = Vec::new();
+
+            // For each row, extract the values of the columns specified in `column_names`
+            for row in data {
+                let mut row_predictors = Vec::new();
+                for column_name in column_names {
+                    if let Some(index) = headers.iter().position(|h| h == column_name) {
+                        if let Some(value) = row.get(index) {
+                            row_predictors.push(value.clone());
+                        }
+                    }
+                }
+                predictors.push(row_predictors);
+            }
+
+            predictors
+        }
+
+        fn train_and_predict_dynamic_linear_regression(
+            training_predictors: Vec<Vec<String>>,
+            training_outputs: Vec<f64>,
+            output_range: Vec<f64>,
+            test_predictors: Vec<Vec<String>>,
+        ) -> Result<Vec<f64>, Box<dyn Error>> {
+            fn tap_linear_regression(
+                training_inputs: &[&[f64]],
+                training_outputs: Vec<f64>,
+                test_inputs: &[&[f64]],
+            ) -> Vec<f64> {
+                // Convert training and test features into DenseMatrix
+
+                //dbg!(&training_inputs, &training_outputs, &test_inputs);
+
+                let training_inputs_data_matrix = DenseMatrix::from_2d_array(training_inputs);
+                let test_inputs_data_matrix = DenseMatrix::from_2d_array(test_inputs);
+
+                //dbg!(&training_inputs_data_matrix, &test_inputs_data_matrix);
+
+                // Train the linear regression model
+                let lr = LinearRegression::fit(
+                    &training_inputs_data_matrix,
+                    &training_outputs,
+                    LinearRegressionParameters::default()
+                        .with_solver(LinearRegressionSolverName::QR),
+                )
+                .unwrap();
+
+                // Predict final grades for new student data
+                let predicted_grades = lr.predict(&test_inputs_data_matrix).unwrap();
+
+                predicted_grades
+            }
+
+            fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+                // Convert both strings to lowercase for case-insensitive comparison
+                let s1 = s1.to_lowercase();
+                let s2 = s2.to_lowercase();
+
+                let s1_len = s1.chars().count();
+                let s2_len = s2.chars().count();
+                let mut cost = vec![vec![0; s2_len + 1]; s1_len + 1];
+
+                for i in 0..=s1_len {
+                    cost[i][0] = i;
+                }
+                for j in 0..=s2_len {
+                    cost[0][j] = j;
+                }
+
+                for i in 1..=s1_len {
+                    for j in 1..=s2_len {
+                        let sub_cost = if s1.chars().nth(i - 1) == s2.chars().nth(j - 1) {
+                            0
+                        } else {
+                            1
+                        };
+                        cost[i][j] = *[
+                            cost[i - 1][j] + 1,
+                            cost[i][j - 1] + 1,
+                            cost[i - 1][j - 1] + sub_cost,
+                        ]
+                        .iter()
+                        .min()
+                        .unwrap();
+                    }
+                }
+
+                cost[s1_len][s2_len]
+            }
+
+            fn find_optimal_character(training_predictors: &Vec<Vec<String>>) -> char {
+                let alphabet = "abcdefghijklmnopqrstuvwxyz";
+                let mut max_distance = 0;
+                let mut optimal_char = 'a';
+
+                for c in alphabet.chars() {
+                    let mut min_distance = usize::MAX;
+                    for conversation in training_predictors.iter() {
+                        for message in conversation.iter() {
+                            let distance = levenshtein_distance(message, &c.to_string());
+                            if distance < min_distance {
+                                min_distance = distance;
+                            }
+                        }
+                    }
+                    if min_distance > max_distance {
+                        max_distance = min_distance;
+                        optimal_char = c;
+                    }
+                }
+
+                optimal_char
+            }
+
+            fn try_parse_to_f64(s: &str) -> Option<f64> {
+                s.parse::<f64>().ok()
+            }
+
+            // Function to convert a string value to f64 using either direct conversion or levenshtein distance
+            fn convert_to_numerical(value: &str, optimal_char_str: &str) -> f64 {
+                // Attempt to directly convert the string to f64
+                if let Some(num) = try_parse_to_f64(value) {
+                    num
+                } else {
+                    // Fallback to calculating levenshtein distance if direct conversion is not possible
+                    levenshtein_distance(value, optimal_char_str) as f64
+                }
+            }
+
+            // Check if there are any training predictors and calculate the required number of predictors
+            if training_predictors.is_empty() {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "The training predictors vector is empty.",
+                )));
+            }
+
+            let required_min_predictors = training_predictors.len() / 2;
+            let current_feature_length = if let Some(first_row) = training_predictors.first() {
+                first_row.len()
+            } else {
+                0 // Default to 0 if for some reason there's no first row, should be caught by is_empty check
+            };
+
+            if current_feature_length * 2 < training_predictors.len() {
+                let additional_required = required_min_predictors - current_feature_length;
+                return Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Insufficient training data. You need at least {} more training predictors.", additional_required),
+        )));
+            }
+
+            let optimal_char = find_optimal_character(&training_predictors);
+            let optimal_char_str = optimal_char.to_string();
+
+            let numerical_training_data: Vec<Vec<f64>> = training_predictors
+                .iter()
+                .map(|conversation| {
+                    conversation
+                        .iter()
+                        .map(|message| convert_to_numerical(message, &optimal_char_str))
+                        .collect()
+                })
+                .collect();
+
+            let numerical_test_data: Vec<Vec<f64>> = test_predictors
+                .iter()
+                .map(|conversation| {
+                    conversation
+                        .iter()
+                        .map(|message| convert_to_numerical(message, &optimal_char_str))
+                        .collect()
+                })
+                .collect();
+
+            let borrowed_training_data: Vec<&[f64]> =
+                numerical_training_data.iter().map(AsRef::as_ref).collect();
+            let borrowed_test_data: Vec<&[f64]> =
+                numerical_test_data.iter().map(AsRef::as_ref).collect();
+
+            // Convert Vec<&[f64]> into &[&[f64]] for both training and test data
+            let slice_of_slices_training_data: &[&[f64]] = &borrowed_training_data;
+            let slice_of_slices_test_data: &[&[f64]] = &borrowed_test_data;
+
+            let regression_results = tap_linear_regression(
+                &slice_of_slices_training_data,
+                training_outputs.clone(),
+                &slice_of_slices_test_data,
+            );
+
+            let max_training_output = output_range
+                .iter()
+                .cloned()
+                .fold(f64::NEG_INFINITY, f64::max);
+            let min_training_output = output_range.iter().cloned().fold(f64::INFINITY, f64::min);
+
+            //dbg!(&max_training_output, &min_training_output);
+
+            // Adjust predictions to ensure they fall within the min and max range of training_outputs
+            let adjusted_predictions: Vec<f64> = regression_results
+                .iter()
+                .map(|&x| {
+                    if x < min_training_output {
+                        min_training_output
+                    } else if x > max_training_output {
+                        max_training_output
+                    } else {
+                        x
+                    }
+                })
+                .collect();
+
+            Ok(adjusted_predictions)
+        }
+
+        if let Some(index) = self.headers.iter().position(|h| h == new_column_name) {
+            // Remove the column from headers
+            self.headers.remove(index);
+
+            // Remove the corresponding data from each row
+            for row in &mut self.data {
+                if index < row.len() {
+                    row.remove(index);
+                }
+            }
+        }
+
+        // First, add the new column header
+        self.headers.push(new_column_name.to_string());
+
+        // Prepare test predictors based on the column names provided
+        let test_predictors =
+            prepare_test_predictors(&self.data, &self.headers, &test_predictors_column_names);
+
+        // Call the ML function to get predictions
+        match train_and_predict_dynamic_linear_regression(
+            training_predictors,
+            training_outputs,
+            output_range,
+            test_predictors,
+        ) {
+            Ok(predictions) => {
+                // Iterate over each row and append the prediction
+                for (i, row) in self.data.iter_mut().enumerate() {
+                    if let Some(prediction) = predictions.get(i) {
+                        row.push(prediction.to_string());
+                    } else {
+                        // Handle the case where there is no prediction (should not happen in theory)
+                        row.push("Error".to_string());
+                    }
+                }
+            }
+            Err(e) => {
+                // Handle the error, e.g., by setting the error field of CsvBuilder
+                self.error = Some(e);
+            }
+        }
+
+        self
+    }
+
     pub fn append_derived_category_column(
         &mut self,
         new_column_name: &str,
         categories: Vec<(&str, Vec<(&str, Exp)>, &str)>,
     ) -> &mut Self {
+        if let Some(index) = self.headers.iter().position(|h| h == new_column_name) {
+            // Remove the column from headers
+            self.headers.remove(index);
+
+            // Remove the corresponding data from each row
+            for row in &mut self.data {
+                if index < row.len() {
+                    row.remove(index);
+                }
+            }
+        }
+
         // Add new column header
         self.headers.push(new_column_name.to_string());
 
@@ -2237,6 +2539,18 @@ impl CsvBuilder {
         new_column_name: &str,
         items_to_concatenate: Vec<&str>,
     ) -> &mut Self {
+        if let Some(index) = self.headers.iter().position(|h| h == new_column_name) {
+            // Remove the column from headers
+            self.headers.remove(index);
+
+            // Remove the corresponding data from each row
+            for row in &mut self.data {
+                if index < row.len() {
+                    row.remove(index);
+                }
+            }
+        }
+
         // Add new column header
         self.headers.push(new_column_name.to_string());
 
@@ -3665,5 +3979,67 @@ impl CsvResultCacher {
             // Implement logic to save the generated data to self.cache_path
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_append_derived_linear_regression_column() {
+        // Setup a CsvBuilder with dummy data
+        let mut csv_builder = CsvBuilder {
+            headers: vec!["Feature1".to_string(), "Feature2".to_string()],
+            data: vec![
+                vec!["90".to_string(), "85".to_string()],
+                vec!["10".to_string(), "60".to_string()],
+            ],
+            limit: None,
+            error: None,
+        };
+
+        // Mock training data (for simplicity, not necessarily meaningful)
+        let training_predictors = vec![
+            vec!["90".to_string(), "95".to_string()],
+            vec!["70".to_string(), "72".to_string()],
+            vec!["60".to_string(), "58".to_string()],
+            vec!["40".to_string(), "28".to_string()],
+        ];
+        let training_outputs = vec![72.0, 65.0, 63.0, 56.0];
+        let output_range = vec![0.0, 100.0];
+        let test_predictors_column_names = vec!["Feature1".to_string(), "Feature2".to_string()];
+
+        // Call the function under test
+        let result = csv_builder.append_derived_linear_regression_column(
+            "Predictions",
+            training_predictors,
+            training_outputs,
+            output_range,
+            test_predictors_column_names,
+        );
+
+        dbg!(&result);
+
+        // Assert the new column was added correctly to headers
+        assert_eq!(
+            csv_builder.headers,
+            vec!["Feature1", "Feature2", "Predictions"],
+            "Headers should include the new 'Predicted' column"
+        );
+
+        for (i, row) in csv_builder.data.iter().enumerate() {
+            assert_eq!(
+                row.len(),
+                3,
+                "Row {} should have 3 columns after the update",
+                i
+            );
+            assert!(
+                !row[2].is_empty(),
+                "The 'Predicted' column in row {} should not be empty",
+                i
+            );
+        }
     }
 }

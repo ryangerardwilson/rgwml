@@ -7,13 +7,6 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 1. Overview
 -----------
 
-## `db_utils`
-
-- **Purpose**: Query various SQL databases with simple elegant syntax.
-- **Features**: This module supports the following database connections:
-  - MSSQL
-  - MYSQL
-
 ## `csv_utils`
 
 - **Purpose**: A Comprehensive Toolkit for CSV File Management, in AI/ML pipelines.
@@ -27,6 +20,13 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
     - **Flexible Saving Options**: Save your modified CSV to a desired path.
   - **CsvResultCacher**: Cache results of CSV operations, enhancing performance for repetitive tasks.
   - **CsvConverter**: Seamlessly convert various data formats like JSON into CSV, expanding the utility of your data.
+
+## `db_utils`
+
+- **Purpose**: Query various SQL databases with simple elegant syntax.
+- **Features**: This module supports the following database connections:
+  - MSSQL
+  - MYSQL
 
 ## `ai_utils`
 
@@ -42,50 +42,7 @@ This library simplifies Data Science, Machine Learning, and Artifical Intelligen
 - **Features**: 
   - **ApiCallBuilder**: Make and cache API calls effortlessly, and manage cached data for efficient API usage.
 
-## `loop_utils`
-
-- **Purpose**: Simplify asynchronous operations in loops.
-- **Features**: 
-  - **FutureLoop**: Handle multiple tasks simultaneously when working with lists or collections, while working with a fluent interface.
-
-2. `db_utils`
------------
-
-### Easily query a MSSQL or MYSQL server to extract data
-
-    use rgwml::db_utils::DbConnect;
-
-    #[tokio::main]
-    async fn main() {
-        let result = DbConnect::execute_mssql_query( // use `execute_mysql_query` for MYSQL
-            "username", 
-            "password", 
-            "server/host", 
-            "database", 
-            "SELECT * FROM your_table").await?;
-
-        let headers = result.0;
-        let row_data = result.1;
-    }
-
-### Easily query a MYSQL server to write data
-
-Easily query a MSSQL or MYSQL server to extract data
-
-    use rgwml::db_utils::DbConnect;
-
-    #[tokio::main]
-    async fn main() {
-        let result = DbConnect::execute_mysql_write(
-            "username", 
-            "password", 
-            "server/host", 
-            "database", 
-            ""INSERT INTO your_table (column1, column2) VALUES ('value1', 'value2')").await?;
-    }
-
-
-3. `csv_utils`
+2. `csv_utils`
 ------------
 
 The `csv_utils` module encompasses a set of utilities designed to simplify various tasks associated with CSV files. These utilities include the `CsvBuilder` for creating and managing CSV files, the `CsvConverter` for transforming JSON data into CSV format, and the `CsvResultCacher` for efficient data caching and retrieval. Each utility is tailored to enhance productivity and ease in handling CSV data in different scenarios.
@@ -449,6 +406,17 @@ Example 6: Load a new instance from an existing instance
             )
         )
     .append_derived_concatenation_column("NewColumnName", vec!["Column1", " ", "Column2", "@"]) // Items in the vector that are not column names will be concatenated as strings
+    .append_derived_linear_regression_column(
+        "predictions",                  // name of new column to store predictions
+        vec![                           // predictor combinations/ feature sets - length should be 2x the number of predictors/features
+            vec!["90", "good"],         // predictor/ feature values can also be text strings. The model uses a Levenshtein distance based approach to tokenize strings.
+            vec!["70", "bad"], 
+            vec!["60", "great"], 
+            vec!["40", "awful"]
+        ], 
+        vec![72.0, 65.0, 63.0, 56.0],   // labels mapped to the above predictors
+        vec![0.0, 100.0],               // normalization range of minimum and maximum prediction value
+        vec!["Column1", "Column7"])     // names of columns whose values are to be used to make predictions as the 'test' data set 
     .append_fuzzai_analysis_columns(
         "Column1", // Name of column to be analyzed
         "sales_analysis", // Identifier for newly created columns
@@ -585,6 +553,42 @@ These methods return specific data, instead of a mutable CsvBuilder object, and 
         }
     }
 
+3. `db_utils`
+-----------
+
+### Easily query a MSSQL or MYSQL server to extract data
+
+    use rgwml::db_utils::DbConnect;
+
+    #[tokio::main]
+    async fn main() {
+        let result = DbConnect::execute_mssql_query( // use `execute_mysql_query` for MYSQL
+            "username", 
+            "password", 
+            "server/host", 
+            "database", 
+            "SELECT * FROM your_table").await?;
+
+        let headers = result.0;
+        let row_data = result.1;
+    }
+
+### Easily query a MYSQL server to write data
+
+Easily query a MSSQL or MYSQL server to extract data
+
+    use rgwml::db_utils::DbConnect;
+
+    #[tokio::main]
+    async fn main() {
+        let result = DbConnect::execute_mysql_write(
+            "username", 
+            "password", 
+            "server/host", 
+            "database", 
+            ""INSERT INTO your_table (column1, column2) VALUES ('value1', 'value2')").await?;
+    }
+
 4. `ai_utils`
 -----------
 
@@ -708,28 +712,7 @@ Examples across common API call patterns
         Ok(response)
     }
 
-6. `loop_utils`
--------------
-
-### FutureLoop
-
-`FutureLoop` provides a fluent interface to do multiple things at once (asynchronously) when dealing with a list or collection of items. 
-
-The `future_for` function suits scenarios where you need a moderate level of concurrency. For instance, when each item's processing is relatively straightforward and doesn't require complex shared state or high-throughput parallelism. 
-
-    use rgwml::loop_utils::FutureLoop;
-
-    #[tokio::main()]
-    async fn main() {
-        let data = vec![1, 2, 3, 4, 5];
-        let results = FutureLoop::future_for(data, |num| async move {
-            // Perform an async operation
-            num * 2
-        }).await;
-        println!("Results: {:?}", results);
-    }
-
-7. License
+6. License
 ----------
 
 This project is licensed under the MIT License - see the LICENSE file for details.
