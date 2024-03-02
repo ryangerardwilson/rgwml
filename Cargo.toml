@@ -1,6 +1,6 @@
 [package]
 name = "rgwml"
-version = "1.1.91"
+version = "1.1.92"
 edition = "2021"
 authors = ["Ryan Gerard Wilson"]
 description = "A crate for reducing cognitive overload while using rust for ml, ai, and data science operations"
@@ -19,7 +19,7 @@ fuzzywuzzy = "0.0.2"
 futures = "0.3"
 chrono = "0.4.31"
 regex = "1.10.2"
-calamine = "0.23.1"
+calamine = "0.24.0"
 rand = "0.8.5"
 tiberius = { version = "0.12.2", features = ["chrono"] }
 tokio-util = { version = "0.7", features = ["compat"] }
