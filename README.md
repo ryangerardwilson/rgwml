@@ -406,6 +406,16 @@ Example 6: Load a new instance from an existing instance
             )
         )
     .append_derived_concatenation_column("NewColumnName", vec!["Column1", " ", "Column2", "@"]) // Items in the vector that are not column names will be concatenated as strings
+    .append_derived_openai_analysis_columns(
+        "column7",                      // Name of the column to be analyzed 
+        std::collections::HashMap::from([
+            ("noun".to_string(), "extract the noun from the sentence".to_string()),
+            ("verb".to_string(), "extract the verb from the sentence".to_string()),
+        ]),
+        "YOUR_OPEN_AI_API_KEY",
+        "gpt-3.5-turbo-0125"            // Any OpenAI model with the JSON mode feature
+        )
+        .await
     .append_derived_linear_regression_column(
         "predictions",                  // name of new column to store predictions
         vec![                           // predictor combinations/ feature sets - length should be 2x the number of predictors/features
@@ -632,21 +642,21 @@ Examples across common API call patterns
 
     #[tokio::main]
     async fn main() {
-        // Fetch and cache post request without headers
+        // Fetch and cache post request without headers, with retry mechanism
         let response = fetch_and_cache_post_request().await.unwrap_or_else(|e| {
             eprintln!("Failed to fetch data: {}", e);
             std::process::exit(1);
         });
         println!("Response: {:?}", response);
 
-        // Fetch and cache post request with headers
+        // Fetch and cache post request with headers, with retry mechanism
         let response_with_headers = fetch_and_cache_post_request_with_headers().await.unwrap_or_else(|e| {
             eprintln!("Failed to fetch data with headers: {}", e);
             std::process::exit(1);
         });
         println!("Response with headers: {:?}", response_with_headers);
 
-        // Fetch and cache post request with form URL encoded content type
+        // Fetch and cache post request with form URL encoded content type, with retry mechanism
         let response_form_urlencoded = fetch_and_cache_post_request_form_urlencoded().await.unwrap_or_else(|e| {
             eprintln!("Failed to fetch form URL encoded data: {}", e);
             std::process::exit(1);
@@ -654,7 +664,7 @@ Examples across common API call patterns
         println!("Form URL encoded response: {:?}", response_form_urlencoded);
     }
 
-    // Example 1: Without Headers
+    // Example 1: Without Headers, includes retry mechanism
     async fn fetch_and_cache_post_request() -> Result<String, Box<dyn std::error::Error>> {
         let method = "POST";
         let url = "http://example.com/api/submit";
@@ -665,13 +675,14 @@ Examples across common API call patterns
 
         let response = ApiCallBuilder::call(method, url, None, Some(payload))
             .maintain_cache(30, "/path/to/post_cache.json") // Uses cache for 30 minutes
+            .retries(3, 5) // Retry up to 3 times with a 5-second timeout between retries
             .execute()
             .await?;
 
         Ok(response)
     }
 
-    // Example 2: With Headers
+    // Example 2: With Headers, includes retry mechanism
     async fn fetch_and_cache_post_request_with_headers() -> Result<String, Box<dyn std::error::Error>> {
         let method = "POST";
         let url = "http://example.com/api/submit";
@@ -686,13 +697,14 @@ Examples across common API call patterns
 
         let response = ApiCallBuilder::call(method, url, Some(headers), Some(payload))
             .maintain_cache(30, "/path/to/post_with_headers_cache.json") // Uses cache for 30 minutes
+            .retries(3, 5) // Retry up to 3 times with a 5-second timeout between retries
             .execute()
             .await?;
 
         Ok(response)
     }
 
-    // Example 3: With application/x-www-form-urlencoded Content-Type
+    // Example 3: With application/x-www-form-urlencoded Content-Type, includes retry mechanism
     async fn fetch_and_cache_post_request_form_urlencoded() -> Result<String, Box<dyn std::error::Error>> {
         let method = "POST";
         let url = "http://example.com/api/submit";
@@ -706,6 +718,7 @@ Examples across common API call patterns
 
         let response = ApiCallBuilder::call(method, url, Some(headers), Some(payload))
             .maintain_cache(30, "/path/to/post_form_urlencoded_cache.json") // Uses cache for 30 minutes
+            .retries(3, 5) // Retry up to 3 times with a 5-second timeout between retries
             .execute()
             .await?;
 

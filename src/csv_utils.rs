@@ -1,8 +1,7 @@
 // csv_utils.rs
 
+use crate::api_utils::ApiCallBuilder;
 use crate::db_utils::DbConnect;
-//use crate::api_utils::ApiCallBuilder;
-//use serde_json::json;
 use calamine::{open_workbook, Reader, Xls};
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, Timelike};
 use csv::Writer;
@@ -12,6 +11,7 @@ use futures::Future;
 use fuzzywuzzy::fuzz;
 use rand::{seq::SliceRandom, thread_rng};
 use regex::Regex;
+use serde_json::json;
 use serde_json::Value;
 use smartcore::linalg::basic::matrix::DenseMatrix;
 use smartcore::linear::linear_regression::{
@@ -2182,6 +2182,122 @@ impl CsvBuilder {
         self
     }
 
+    /*
+    pub async fn append_derived_openai_analysis_columns(
+        &mut self,
+        column_to_analyze: &str,
+        analysis_query: HashMap<String, String>,
+        api_key: &str,
+        model: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        // Find the index of the column to analyze
+        let column_index = self.headers.iter().position(|h| h == column_to_analyze)
+            .ok_or("Column to analyze not found")?;
+
+        // Prepare to update headers based on analysis keys, avoiding duplicates
+        for key in analysis_query.keys() {
+            if !self.headers.contains(key) {
+                self.headers.push(key.clone());
+            }
+        }
+
+        // Temporary vector to hold updated rows
+        let mut updated_data = Vec::new();
+
+        // Iterate over each row
+        for row in &self.data {
+            let cell_value = row.get(column_index).ok_or("Cell value not found")?;
+
+
+            dbg!(&cell_value, &analysis_query);
+            // Perform analysis
+            let analysis_results = get_openai_analysis_json(cell_value, analysis_query.clone(), api_key, model).await?;
+            dbg!(&analysis_results);
+            // Clone the row and update it with analysis results
+            let mut row_clone = row.clone();
+            for (key, value) in analysis_results.iter() {
+                let index = self.headers.iter().position(|h| h == key).unwrap(); // Safe due to earlier check
+                if index >= row_clone.len() {
+                    row_clone.push(value.clone());
+                } else {
+                    row_clone[index] = value.clone();
+                }
+            }
+            updated_data.push(row_clone);
+        }
+
+        dbg!(&updated_data);
+
+        // Replace the original data with the updated data
+        self.data = updated_data;
+
+        Ok(())
+    }
+    */
+
+    pub async fn append_derived_openai_analysis_columns(
+        &mut self,
+        column_to_analyze: &str,
+        analysis_query: HashMap<String, String>,
+        api_key: &str,
+        model: &str,
+    ) -> &mut Self {
+        // Attempt to find the index of the column to analyze
+        if let Some(column_index) = self.headers.iter().position(|h| h == column_to_analyze) {
+            // Prepare to update headers based on analysis keys, avoiding duplicates
+            for key in analysis_query.keys() {
+                if !self.headers.contains(key) {
+                    self.headers.push(key.clone());
+                }
+            }
+
+            // Temporary vector to hold updated rows
+            let mut updated_data = Vec::new();
+
+            for row in &self.data {
+                if let Some(cell_value) = row.get(column_index) {
+                    let analysis_results = get_openai_analysis_json(
+                        cell_value,
+                        analysis_query.clone(),
+                        api_key,
+                        model,
+                    )
+                    .await
+                    .unwrap_or_default();
+                    //dbg!(&analysis_results);
+
+                    // Clone the row
+                    let mut row_clone = row.clone();
+
+                    // Ensure row_clone has the same length as headers, filling with default values if necessary
+                    while row_clone.len() < self.headers.len() {
+                        row_clone.push("".to_string()); // Use an appropriate default value
+                    }
+
+                    // Update row_clone with analysis results
+                    for (key, value) in analysis_results.iter() {
+                        if let Some(index) = self.headers.iter().position(|h| h == key) {
+                            row_clone[index] = value.clone(); // Now safe to directly assign since row_clone matches headers length
+                        }
+                    }
+
+                    updated_data.push(row_clone);
+                } else {
+                    // Handle the case where cell_value is not found if necessary
+                    updated_data.push(row.clone());
+                }
+            }
+
+            // Replace the original data with the updated data
+            self.data = updated_data;
+        } else {
+            // Handle the error case where column_to_analyze is not found
+            // For this example, we simply do nothing, but in practice, you might want to log an error or take other actions
+        }
+
+        self
+    }
+
     pub fn append_derived_linear_regression_column(
         &mut self,
         new_column_name: &str,
@@ -3982,6 +4098,114 @@ impl CsvResultCacher {
     }
 }
 
+pub async fn get_openai_analysis_json(
+    text_to_be_analyzed: &str,
+    analysis_query: HashMap<String, String>,
+    api_key: &str,
+    model: &str,
+) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
+    let mut instruction = "Your only job is to extract information from the user's content and render a json in the below format: {".to_owned();
+    let mut meanings =
+        " Your response should take into account the following meanings of the keys:\n".to_owned();
+    let mut counter = 1;
+
+    for (key, value) in &analysis_query {
+        instruction += &format!(" '{}': 'your response',", key);
+        meanings += &format!(" {}. {}: {}\n", counter, key, value);
+        counter += 1;
+    }
+    instruction.pop(); // Remove the last comma
+    instruction += "},"; // Close the format part
+    instruction += &meanings;
+    instruction += " with each response being less than 12 words.";
+
+    //dbg!(&instruction, &text_to_be_analyzed);
+
+    let method = "POST";
+    let url = "https://api.openai.com/v1/chat/completions";
+    let headers = json!({
+        "Content-Type": "application/json",
+        "Authorization": format!("Bearer {}", api_key)
+    });
+
+    // Integrating analysis_query into the payload
+    let mut messages = vec![
+        json!({
+            "role": "system",
+            "content": instruction
+        }),
+        json!({
+            "role": "user",
+            "content": text_to_be_analyzed
+        }),
+    ];
+
+    // Optionally, append analysis_query as additional messages or handle differently based on your needs
+    for (key, value) in analysis_query {
+        messages.push(json!({
+            "role": "user",
+            "content": format!("{}: {}", key, value)
+        }));
+    }
+
+    let response_format = json!({"type": "json_object"});
+
+    let payload = json!({
+        "model": model,
+        "response_format": response_format,
+        "messages": messages,
+    });
+
+    let mut attempts = 0;
+    const MAX_ATTEMPTS: usize = 3;
+
+    while attempts < MAX_ATTEMPTS {
+        attempts += 1;
+        let response =
+            match ApiCallBuilder::call(method, url, Some(headers.clone()), Some(payload.clone()))
+                .retries(3, 2)
+                .execute()
+                .await
+            {
+                Ok(response) => response,
+                Err(_) => {
+                    if attempts >= MAX_ATTEMPTS {
+                        return Err("Failed to make API call".into());
+                    }
+                    continue; // Try again
+                }
+            };
+
+        let parsed: Value = match serde_json::from_str(&response) {
+            Ok(parsed) => parsed,
+            Err(_) => {
+                if attempts >= MAX_ATTEMPTS {
+                    return Err("Failed to parse API response".into());
+                }
+                continue; // Try again
+            }
+        };
+
+        if let Some(choices) = parsed["choices"].as_array() {
+            if let Some(first_choice) = choices.first() {
+                if let Some(content) = first_choice["message"]["content"].as_str() {
+                    match serde_json::from_str(content) {
+                        Ok(content_data) => return Ok(content_data),
+                        Err(_) => {
+                            if attempts >= MAX_ATTEMPTS {
+                                return Err("Failed to extract content data".into());
+                            }
+                            continue; // Try again
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Err("Failed to extract content data".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4039,6 +4263,65 @@ mod tests {
                 !row[2].is_empty(),
                 "The 'Predicted' column in row {} should not be empty",
                 i
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_openai_analysis_json() {
+        let text_to_be_analyzed = "this is a beatutiful day";
+        let mut analysis_query = HashMap::new();
+        let api_key = "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";
+        let model = "gpt-3.5-turbo-0125";
+
+        analysis_query.insert("noun".to_string(), "extract the noun".to_string());
+        analysis_query.insert("verb".to_string(), "extract the verb".to_string());
+
+        let result =
+            get_openai_analysis_json(text_to_be_analyzed, analysis_query, api_key, model).await;
+        dbg!(&result);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_append_derived_openai_analysis_columns() {
+        let mut builder = CsvBuilder {
+            headers: vec!["ID".to_string(), "text".to_string()],
+            data: vec![
+                vec!["1".to_string(), "This is a beautiful day".to_string()],
+                vec!["2".to_string(), "Rust is awesome".to_string()],
+            ],
+            limit: None,
+            error: None,
+        };
+
+        let mut analysis_query = HashMap::new();
+        analysis_query.insert("noun".to_string(), "extract the noun".to_string()); // Simulated analysis result
+        analysis_query.insert("verb".to_string(), "extract the verb".to_string()); // Simulated analysis result
+
+        // Assume `get_openai_analysis_json` is mocked to return the above results for any input
+
+        let api_key = "";
+        let model = "gpt-3.5-turbo-0125";
+
+        let result = builder
+            .append_derived_openai_analysis_columns("text", analysis_query, api_key, model)
+            .await;
+        dbg!(&result);
+
+        assert!(
+            builder.headers.contains(&"noun".to_string()),
+            "Headers should include 'noun'"
+        );
+        assert!(
+            builder.headers.contains(&"verb".to_string()),
+            "Headers should include 'verb'"
+        );
+
+        for row in builder.data.iter() {
+            assert!(
+                row.len() > 2,
+                "Each row should have more than 2 columns after analysis"
             );
         }
     }
