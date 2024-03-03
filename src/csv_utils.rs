@@ -1,5 +1,4 @@
 // csv_utils.rs
-
 use crate::api_utils::ApiCallBuilder;
 use crate::db_utils::DbConnect;
 use calamine::{open_workbook, Reader, Xls};
@@ -1471,6 +1470,89 @@ impl CsvBuilder {
         self
     }
 
+    pub fn limit_distributed_raw(&mut self, limit: usize) -> &mut Self {
+        if limit >= self.data.len() || limit == 0 {
+            self.limit = Some(self.data.len());
+            return self;
+        }
+
+        let mut result = Vec::new();
+        let step = self.data.len() as f64 / limit as f64;
+
+        for i in 0..limit {
+            let idx = (i as f64 * step).floor() as usize;
+            result.push(self.data[idx].clone());
+        }
+
+        self.data = result;
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn limit_distributed_category(&mut self, limit: usize, column_name: &str) -> &mut Self {
+        let column_index = match self.headers.iter().position(|r| r == column_name) {
+            Some(index) => index,
+            None => {
+                self.error = Some(Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "Column name not found")));
+                return self;
+            },
+        };
+
+        if limit >= self.data.len() || limit == 0 {
+            self.limit = Some(self.data.len());
+            return self;
+        }
+
+        let mut category_counts = std::collections::HashMap::new();
+        for row in &self.data {
+            *category_counts.entry(row[column_index].clone()).or_insert(0) += 1;
+        }
+
+        let mut category_limits = std::collections::HashMap::new();
+        let total_categories = category_counts.len();
+        let base_limit = limit / total_categories;
+        let mut extra = limit % total_categories;
+
+        for (category, _) in &category_counts {
+            let mut this_limit = base_limit;
+            if extra > 0 {
+                this_limit += 1;
+                extra -= 1;
+            }
+            category_limits.insert(category.clone(), this_limit);
+        }
+
+        let mut new_data = Vec::new();
+        let mut selections = std::collections::HashMap::new();
+
+        for row in &self.data {
+            let category = &row[column_index];
+            let count = selections.entry(category.clone()).or_insert(0);
+            if *count < *category_limits.get(category).unwrap_or(&0) {
+                new_data.push(row.clone());
+                *count += 1;
+            }
+        }
+
+        self.data = new_data;
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn limit_random(&mut self, limit: usize) -> &mut Self {
+        if limit >= self.data.len() || limit == 0 {
+            self.limit = Some(self.data.len());
+            return self;
+        }
+
+        let mut rng = rand::thread_rng();
+        let sample = self.data.as_slice().choose_multiple(&mut rng, limit).cloned().collect();
+
+        self.data = sample;
+        self.limit = Some(limit);
+        self
+    }
+
     pub fn limit_where(
         &mut self,
         limit: usize,
@@ -1562,6 +1644,21 @@ impl CsvBuilder {
                 print!("{}", value);
             }
             println!(); // Add a newline at the end
+        } else {
+            println!("Column '{}' not found", column_name);
+        }
+        self
+    }
+
+    pub fn print_unique_count(&mut self, column_name: &str) -> &mut Self {
+        if let Some(index) = self.headers.iter().position(|h| h == column_name) {
+            let mut unique_values: HashSet<String> = HashSet::new();
+            for row in &self.data {
+                if let Some(value) = row.get(index) {
+                    unique_values.insert(Self::clean_string_value(value));
+                }
+            }
+            println!("Count of unique values in '{}': {}", column_name, unique_values.len());
         } else {
             println!("Column '{}' not found", column_name);
         }

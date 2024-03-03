@@ -232,6 +232,9 @@ Example 6: Load a new instance from an existing instance
     
     // H. Limiting and sorting
     .limit(10)
+    .limit_distributed_raw(10)  //  limit rows distributed as evenly as possible across the dataset
+    .limit_distributed_category(10, "Colum7")  //  limit rows distributed as evenly as possible across the dataset, to maximize variance in values of the indicated column
+    .limit_rand(10)         // limit rows randomly
     .limit_where(
         10,
         vec![
@@ -332,6 +335,7 @@ Example 6: Load a new instance from an existing instance
     .print_table_all_rows() // Prints a truncated table to the terminal, with all rows
     .print_cells(vec!["Column1", "Column2"])
     .print_unique("column_name")
+    .print_unique_count("column_name")
     .print_freq(vec!["Column1", "Column2"])
     .print_freq_mapped(vec![
             ("Column1", vec![
