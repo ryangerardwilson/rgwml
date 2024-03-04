@@ -1,5 +1,5 @@
 // db_utils.rs
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use futures::StreamExt;
 use mysql_async::{prelude::*, OptsBuilder, Pool, Row as MySqlRow};
 use tiberius::{error::Error, AuthMethod, Client, ColumnType, Config, QueryItem, Row};
@@ -139,11 +139,23 @@ impl DbConnect {
                         },
                     ),
 
-                    ColumnType::Datetime | ColumnType::Datetime2 | ColumnType::Datetimen => {
+                    ColumnType::Datetime
+                    | ColumnType::Datetime2
+                    | ColumnType::Datetimen
+                    | ColumnType::Daten
+                    | ColumnType::Timen
+                    | ColumnType::DatetimeOffsetn => {
                         match row.try_get::<NaiveDateTime, _>(i) {
-                            Ok(Some(naive_datetime)) => naive_datetime.to_string(), // Format this appropriately
+                            Ok(Some(naive_datetime)) => {
+                                naive_datetime.format("%Y-%m-%d %H:%M:%S").to_string()
+                            } // Format Datetime appropriately
                             Ok(None) => "".to_string(),
-                            Err(_) => "Error or non-Datetime value".to_string(),
+                            Err(_) => match row.try_get::<NaiveDate, _>(i) {
+                                // Try parsing as NaiveDate if NaiveDateTime fails
+                                Ok(Some(naive_date)) => naive_date.format("%Y-%m-%d").to_string(), // Format Date appropriately
+                                Ok(None) => "".to_string(),
+                                Err(_) => "Error or non-Datetime/Date value".to_string(),
+                            },
                         }
                     }
 

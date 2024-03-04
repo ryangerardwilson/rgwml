@@ -1493,9 +1493,12 @@ impl CsvBuilder {
         let column_index = match self.headers.iter().position(|r| r == column_name) {
             Some(index) => index,
             None => {
-                self.error = Some(Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "Column name not found")));
+                self.error = Some(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Column name not found",
+                )));
                 return self;
-            },
+            }
         };
 
         if limit >= self.data.len() || limit == 0 {
@@ -1505,7 +1508,9 @@ impl CsvBuilder {
 
         let mut category_counts = std::collections::HashMap::new();
         for row in &self.data {
-            *category_counts.entry(row[column_index].clone()).or_insert(0) += 1;
+            *category_counts
+                .entry(row[column_index].clone())
+                .or_insert(0) += 1;
         }
 
         let mut category_limits = std::collections::HashMap::new();
@@ -1546,7 +1551,12 @@ impl CsvBuilder {
         }
 
         let mut rng = rand::thread_rng();
-        let sample = self.data.as_slice().choose_multiple(&mut rng, limit).cloned().collect();
+        let sample = self
+            .data
+            .as_slice()
+            .choose_multiple(&mut rng, limit)
+            .cloned()
+            .collect();
 
         self.data = sample;
         self.limit = Some(limit);
@@ -1658,7 +1668,11 @@ impl CsvBuilder {
                     unique_values.insert(Self::clean_string_value(value));
                 }
             }
-            println!("Count of unique values in '{}': {}", column_name, unique_values.len());
+            println!(
+                "Count of unique values in '{}': {}",
+                column_name,
+                unique_values.len()
+            );
         } else {
             println!("Column '{}' not found", column_name);
         }
