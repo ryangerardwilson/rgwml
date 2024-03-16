@@ -293,29 +293,23 @@ Example 6: Load a new instance from an existing instance
             }),
             ("Exp5", Exp {
                 column: "status".to_string(),
-                operator: "CONTAINS".to_string(),
+                operator: "CONTAINS".to_string(), // Also: "DOES_NOT_CONTAIN"
                 compare_with: ExpVal::STR("REJECTED".to_string()),
                 compare_as: "TEXT".to_string()
             }),
             ("Exp6", Exp {
                 column: "status".to_string(),
-                operator: "DOES_NOT_CONTAIN".to_string(),
-                compare_with: ExpVal::STR("HAS NOT PAID".to_string()),
-                compare_as: "TEXT".to_string()
-            }),
-            ("Exp7", Exp {
-                column: "status".to_string(),
-                operator: "STARTS_WITH".to_string(),
+                operator: "STARTS_WITH".to_string(), // Also: "DOES_NOT_START_WITH"
                 compare_with: ExpVal::STR("VERIFIED".to_string()),
                 compare_as: "TEXT".to_string()
             }),
         ],
-        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6")
     .where_set(
         vec![
             // Same as .where() 
         ],
-        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7",
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6",
         "Column10",
         "IS OKAY")
 
@@ -330,7 +324,7 @@ Example 6: Load a new instance from an existing instance
         vec![
             // Same as .where()
         ],
-        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6")
     .print_table() // Prints a truncated table to the terminal
     .print_table_all_rows() // Prints a truncated table to the terminal, with all rows
     .print_cells(vec!["Column1", "Column2"])
@@ -348,7 +342,7 @@ Example 6: Load a new instance from an existing instance
         vec![
             // Same as .where()
         ],
-        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6")
 
     // L. Grouping Data
     .split_as("ColumnNameToGroupBy", "/output/folder/for/grouped/csv/files/") // Groups data by a specified column and saves each group into a separate CSV file in a given folder
@@ -374,7 +368,7 @@ Example 6: Load a new instance from an existing instance
         vec![
             // Same as .where() 
         ],
-        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6 && Exp7")
+        "Exp1 && (Exp2 || Exp3 || Exp4) && Exp5 && Exp6")
     .append_derived_category_column(
         "EXPENSE_RANGE",
         vec![

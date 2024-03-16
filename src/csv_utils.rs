@@ -119,6 +119,7 @@ impl CompareValue for String {
                 "CONTAINS" => cell_value.contains(&*self),
                 "STARTS_WITH" => cell_value.starts_with(&*self),
                 "DOES_NOT_CONTAIN" => !cell_value.contains(&*self),
+                "DOES_NOT_START_WITH" => !cell_value.starts_with(&*self),
                 _ => false,
             },
 
@@ -1406,9 +1407,10 @@ impl CsvBuilder {
                                     values.apply(cell_value, &exp.operator, &exp.compare_as)
                                 }
                             };
-                            expr_results.insert(*expr_name, result);
+                            //dbg!(&expr_name, &result);
+                            expr_results.insert(&expr_name, result);
                         } else {
-                            expr_results.insert(*expr_name, false);
+                            expr_results.insert(&expr_name, false);
                         }
                     } else {
                         println!("Column '{}' not found in headers.", exp.column);
