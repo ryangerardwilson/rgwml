@@ -623,11 +623,7 @@ impl CsvBuilder {
         self
     }
 
-    /// In CSV column order manipulation, the `...` symbol acts as a pivot point to specify
-    /// where specified columns should be placed within the reordered column sequence.
-    ///
-    /// This flexibility allows you to control column placement in various scenarios, such as
-    /// moving columns to the start, end, or between existing columns.
+
     pub fn order_columns(&mut self, order: Vec<&str>) -> &mut Self {
         // Clone the headers for creating column_map
         let headers_for_map = self.headers.clone();
@@ -1271,6 +1267,39 @@ impl CsvBuilder {
 
         // Update headers
         self.headers = remaining_headers.into_iter().map(|(_, h)| h).collect();
+
+        self
+    }
+
+    /// Retains only the columns specified and orders them.
+    pub fn retain_columns(&mut self, columns_to_retain: Vec<&str>) -> &mut Self {
+        if self.error.is_some() {
+            return self;
+        }
+
+        // Map of header name to its index for efficient lookups
+        let header_map: HashMap<&str, usize> = self.headers.iter().enumerate().map(|(i, header)| (header.as_str(), i)).collect();
+
+        // Filter and order headers based on 'columns_to_retain', preserving order
+        let retained_headers: Vec<String> = columns_to_retain.iter()
+            .filter_map(|&col| {
+                if header_map.contains_key(col) {
+                    Some(col.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Rebuild data rows to include only the retained columns, in the order specified
+        let retained_data: Vec<Vec<String>> = self.data.iter().map(|row| {
+            columns_to_retain.iter()
+                .filter_map(|&col| header_map.get(col).and_then(|&idx| row.get(idx).cloned()))
+                .collect()
+        }).collect();
+
+        self.headers = retained_headers;
+        self.data = retained_data;
 
         self
     }

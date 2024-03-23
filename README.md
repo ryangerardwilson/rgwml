@@ -214,6 +214,7 @@ Example 6: Load a new instance from an existing instance
 
     // E. Modifying columns
     .drop_columns(vec!["Column1", "Column3"])
+    .retain_columns(vec!["Column1", "Column3"])
     .rename_columns(vec![("Column1", "NewColumn1"), ("Column3", "NewColumn3")])
     
     // F. Adding and modifying rows
