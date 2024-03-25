@@ -3737,7 +3737,7 @@ impl CsvBuilder {
 
         //self.remove_duplicate_columns();
         let path_formatted = Path::new(path);
-        Self::remove_duplicate_columns_from_csv(path_formatted);
+        let _ = Self::remove_duplicate_columns_from_csv(path_formatted);
 
         self
     }
@@ -3748,7 +3748,7 @@ impl CsvBuilder {
 
         // Read headers and records in one pass without cloning
         let headers = rdr.headers()?.clone();
-        let mut all_rows: Vec<StringRecord> = rdr.records().collect::<Result<_, _>>()?;
+        let all_rows: Vec<StringRecord> = rdr.records().collect::<Result<_, _>>()?;
 
         // Identify duplicate column indices
         let mut seen_headers = HashSet::new();
