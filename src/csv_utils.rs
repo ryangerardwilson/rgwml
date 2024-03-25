@@ -623,7 +623,6 @@ impl CsvBuilder {
         self
     }
 
-
     pub fn order_columns(&mut self, order: Vec<&str>) -> &mut Self {
         // Clone the headers for creating column_map
         let headers_for_map = self.headers.clone();
@@ -1278,10 +1277,16 @@ impl CsvBuilder {
         }
 
         // Map of header name to its index for efficient lookups
-        let header_map: HashMap<&str, usize> = self.headers.iter().enumerate().map(|(i, header)| (header.as_str(), i)).collect();
+        let header_map: HashMap<&str, usize> = self
+            .headers
+            .iter()
+            .enumerate()
+            .map(|(i, header)| (header.as_str(), i))
+            .collect();
 
         // Filter and order headers based on 'columns_to_retain', preserving order
-        let retained_headers: Vec<String> = columns_to_retain.iter()
+        let retained_headers: Vec<String> = columns_to_retain
+            .iter()
             .filter_map(|&col| {
                 if header_map.contains_key(col) {
                     Some(col.to_string())
@@ -1292,11 +1297,16 @@ impl CsvBuilder {
             .collect();
 
         // Rebuild data rows to include only the retained columns, in the order specified
-        let retained_data: Vec<Vec<String>> = self.data.iter().map(|row| {
-            columns_to_retain.iter()
-                .filter_map(|&col| header_map.get(col).and_then(|&idx| row.get(idx).cloned()))
-                .collect()
-        }).collect();
+        let retained_data: Vec<Vec<String>> = self
+            .data
+            .iter()
+            .map(|row| {
+                columns_to_retain
+                    .iter()
+                    .filter_map(|&col| header_map.get(col).and_then(|&idx| row.get(idx).cloned()))
+                    .collect()
+            })
+            .collect();
 
         self.headers = retained_headers;
         self.data = retained_data;
@@ -2448,6 +2458,8 @@ impl CsvBuilder {
         output_range: Vec<f64>,
         test_predictors_column_names: Vec<String>,
     ) -> &mut Self {
+        //dbg!(&new_column_name, &training_predictors, &training_outputs, &output_range, &test_predictors_column_names);
+
         fn prepare_test_predictors(
             data: &[Vec<String>],
             headers: &[String],
@@ -2596,8 +2608,9 @@ impl CsvBuilder {
             } else {
                 0 // Default to 0 if for some reason there's no first row, should be caught by is_empty check
             };
+            //dbg!(&current_feature_length);
 
-            if current_feature_length * 2 < training_predictors.len() {
+            if current_feature_length * 2 > training_predictors.len() {
                 let additional_required = required_min_predictors - current_feature_length;
                 return Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -2695,6 +2708,7 @@ impl CsvBuilder {
             test_predictors,
         ) {
             Ok(predictions) => {
+                //dbg!(&predictions);
                 // Iterate over each row and append the prediction
                 for (i, row) in self.data.iter_mut().enumerate() {
                     if let Some(prediction) = predictions.get(i) {
@@ -2706,6 +2720,7 @@ impl CsvBuilder {
                 }
             }
             Err(e) => {
+                //dbg!(&e);
                 // Handle the error, e.g., by setting the error field of CsvBuilder
                 self.error = Some(e);
             }
@@ -4331,6 +4346,7 @@ pub async fn get_openai_analysis_json(
         if let Some(choices) = parsed["choices"].as_array() {
             if let Some(first_choice) = choices.first() {
                 if let Some(content) = first_choice["message"]["content"].as_str() {
+                    //dbg!(&content);
                     match serde_json::from_str(content) {
                         Ok(content_data) => return Ok(content_data),
                         Err(_) => {
