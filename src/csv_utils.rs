@@ -3,7 +3,7 @@ use crate::api_utils::ApiCallBuilder;
 use crate::db_utils::DbConnect;
 use calamine::{open_workbook, Reader, Xls};
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, Timelike};
-use csv::Writer;
+use csv::{ReaderBuilder, StringRecord, Trim, Writer, WriterBuilder};
 use futures::executor::block_on;
 use futures::future::join_all;
 use futures::Future;
@@ -24,6 +24,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Error as IoError;
 use std::io::ErrorKind;
+use std::path::Path;
 use std::pin::Pin;
 use std::time::{Duration, SystemTime};
 
@@ -3734,9 +3735,69 @@ impl CsvBuilder {
             eprintln!("Error writing to CSV: {}", e);
         }
 
+        //self.remove_duplicate_columns();
+        let path_formatted = Path::new(path);
+        Self::remove_duplicate_columns_from_csv(path_formatted);
+
         self
     }
 
+    fn remove_duplicate_columns_from_csv(path: &Path) -> Result<(), Box<dyn Error>> {
+        // Open the CSV file
+        let mut rdr = ReaderBuilder::new().trim(Trim::All).from_path(path)?;
+
+        // Read headers and records in one pass without cloning
+        let headers = rdr.headers()?.clone();
+        let mut all_rows: Vec<StringRecord> = rdr.records().collect::<Result<_, _>>()?;
+
+        // Identify duplicate column indices
+        let mut seen_headers = HashSet::new();
+        let mut duplicate_indices = Vec::new();
+        for (index, header) in headers.iter().enumerate() {
+            if !seen_headers.insert(header) {
+                duplicate_indices.push(index);
+            }
+        }
+
+        // Filter out duplicate columns
+        let cleaned_headers: Vec<String> = headers
+            .iter()
+            .enumerate()
+            .filter_map(|(index, header)| {
+                if duplicate_indices.contains(&index) {
+                    None
+                } else {
+                    Some(header.to_string())
+                }
+            })
+            .collect();
+
+        let cleaned_rows: Vec<Vec<String>> = all_rows
+            .into_iter()
+            .map(|row| {
+                row.iter()
+                    .enumerate()
+                    .filter_map(|(index, field)| {
+                        if duplicate_indices.contains(&index) {
+                            None
+                        } else {
+                            Some(field.to_string())
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // Write cleaned data back to the file
+        let mut wtr = WriterBuilder::new().from_path(path)?;
+        wtr.write_record(&cleaned_headers)?;
+        for row in cleaned_rows {
+            wtr.write_record(&row)?;
+        }
+        wtr.flush()?;
+
+        Ok(())
+    }
     #[allow(unreachable_code)]
     pub fn die(&mut self) -> &mut Self {
         println!("Giving up the ghost!");
