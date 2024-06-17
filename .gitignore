@@ -1,0 +1,12 @@
+/target
+/Cargo.lock
+examples/
+*.swp
+*.json
+/python_executables/build
+/python_executables/dist  
+/python_executables/db_connect.spec
+/python_executables/__pycache__
+/python_executables/venv
+
+

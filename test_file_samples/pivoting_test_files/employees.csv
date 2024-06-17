@@ -1,0 +1,12 @@
+id,name,age,gender,salary,is_manager,department
+1,Alice,30,F,70000,0,HR
+2,Bob,35,M,80000,1,Engineering
+3,Charlie,40,M,120000,1,Engineering
+4,David,25,M,60000,0,Sales
+5,Eve,45,F,95000,1,HR
+6,Frank,28,M,45000,0,Sales
+7,Grace,32,F,110000,0,HR
+8,Hank,50,M,105000,1,Sales
+9,Ivy,27,F,98000,0,Engineering
+10,Jack,30,M,75000,1,HR
+
